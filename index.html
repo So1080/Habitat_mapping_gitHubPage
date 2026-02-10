@@ -198,24 +198,70 @@
         window.addEventListener('keydown', (e) => {
             if (phase === "SELECTION") {
                 const hab = HABITATS[currentHabIdx];
+                
                 if (["1", "2", "3"].includes(e.key)) {
-                    selectedOptions[hab] = parseInt(e.key) - 1;
+                    const optionIdx = parseInt(e.key) - 1;
+                    selectedOptions[hab] = optionIdx;
                     document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
-                    // In a real setup, you'd map these to the complex paths in your Python script 
+                    
+                    // Play from the SOUND_OPTIONS list
                     const soundFile = SOUND_OPTIONS[hab][optionIdx];
                     playSound(soundFile);
                 }
-                if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
-                    if (currentHabIdx < HABITATS.length - 1) {
-                        currentHabIdx++;
-                        updateMenu();
+
+                if (e.key === "Enter") {
+                    // Check if they made a selection for the CURRENT habitat before moving on
+                    if (selectedOptions[hab] !== undefined) {
+                        if (currentHabIdx < HABITATS.length - 1) {
+                            currentHabIdx++;
+                            updateMenu();
+                        } else {
+                            // They've reached the end. Show the button!
+                            document.getElementById('start-btn').classList.remove('hidden');
+                            document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+                        }
                     } else {
-                        document.getElementById('start-btn').classList.remove('hidden');
-                        document.getElementById('menu-instructions').innerText = "All sounds selected. Click below to begin.";
+                        document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
                     }
                 }
             }
         });
+
+        // window.addEventListener('keydown', (e) => {
+        //     if (phase === "SELECTION") {
+        //         const hab = HABITATS[currentHabIdx];
+                
+        //         if (["1", "2", "3"].includes(e.key)) {
+        //             const optionIdx = parseInt(e.key) - 1;
+        //             selectedOptions[hab] = parseInt(e.key) - 1;
+        //             document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
+        //             // In a real setup, you'd map these to the complex paths in your Python script 
+        //             const soundFile = SOUND_OPTIONS[hab][optionIdx];
+        //             playSound(soundFile);
+        //         }
+        //         if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
+        //             if (currentHabIdx < HABITATS.length - 1) {
+        //                 // Move to the next habitat
+        //                 currentHabIdx++;
+        //                 updateMenu();
+        //             } else {
+        //                 // All habitats have been cycled through. 
+        //                 // Now verify if every habitat actually has a saved selection.
+        //                 const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
+                        
+        //                 if (allSelected) {
+        //                     document.getElementById('start-btn').classList.remove('hidden');
+        //                     document.getElementById('menu-instructions').innerText = "All sounds selected! Click below to begin.";
+                            
+        //                     // Optional: Stop the narrator audio so it doesn't overlap with the start of the game
+        //                     if (activeAudio) activeAudio.pause();
+        //                 } else {
+        //                     document.getElementById('menu-instructions').innerText = "Please select a sound (1, 2, or 3) for this habitat first.";
+        //                 }
+        //             }
+        //         }
+        //     }
+        // });
 
         // --- DATA LOGGING  ---
         function logInteraction(habitat, choice) {
@@ -238,7 +284,29 @@
         }
 
         // --- COMPUTER VISION ACTIVITY ---
+
         function playSound(file, loop = false) {
+            if (activeAudio) {
+                activeAudio.pause();
+                activeAudio.src = ""; // Clear the old source
+            }
+            
+            activeAudio = new Audio(file);
+            activeAudio.loop = loop;
+            
+            // Explicitly play and handle the promise
+            const playPromise = activeAudio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.catch(error => {
+                    console.error("Playback failed. This usually means a click was required first:", error);
+                    // If it fails, we try to play it again on the very next click
+                    window.addEventListener('click', () => { activeAudio.play(); }, { once: true });
+                });
+            }
+        }
+
+        function playSound_old(file, loop = false) {
             if (activeAudio) activeAudio.pause();
             activeAudio = new Audio(file);
             activeAudio.loop = loop;
@@ -347,7 +415,6 @@
         }
 
         document.getElementById('start-btn').onclick = startActivity;
-        updateMenu();
 
         let homographyMatrix = null;
         const maskImg = new Image(); // Ensure this is globally defined
@@ -364,7 +431,8 @@
             let mat = cv.imread(videoFrame);
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
-            let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
+            // let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
+            let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(mat, cornersList, ids);
