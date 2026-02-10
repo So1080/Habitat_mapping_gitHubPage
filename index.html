@@ -54,8 +54,11 @@
 </head>
 <body>
     <div id="loading-overlay">
-        <div class="spinner"></div>
-        <p>Loading Computer Vision AI...</p>
+        <div id="loading-status">
+            <div class="spinner"></div>
+            <p>Loading Computer Vision AI...</p>
+        </div>
+        <button id="ready-btn" class="btn hidden" onclick="confirmReady()">ENTER STUDY</button>
     </div>
 
     <div id="setup-screen">
@@ -158,11 +161,14 @@
             cvReady = true;
             console.log("OpenCV is fully loaded and ready!");
             // Hide the loading overlay so the user can see the Selection menu
-            const loader = document.getElementById('loading-overlay');
-            if (loader) {
-                loader.style.opacity = '0';
-                setTimeout(() => loader.classList.add('hidden'), 500); // Smooth fade out
-            }
+            document.getElementById('loading-status').classList.add('hidden');
+            document.getElementById('ready-btn').classList.remove('hidden');
+        }
+
+        function confirmReady() {
+            // This click "unlocks" audio for the browser
+            document.getElementById('loading-overlay').classList.add('hidden');
+            updateMenu(); // Now the first narrator sound will actually play!
         }
 
         let calibration = { x: 0, y: 0, scale: 1.0 };
@@ -196,7 +202,8 @@
                     selectedOptions[hab] = parseInt(e.key) - 1;
                     document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
                     // In a real setup, you'd map these to the complex paths in your Python script 
-                    playSound(`sounds/${hab.replace(/ /g, "_")}_option${e.key}.wav`);
+                    const soundFile = SOUND_OPTIONS[hab][optionIdx];
+                    playSound(soundFile);
                 }
                 if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
                     if (currentHabIdx < HABITATS.length - 1) {
@@ -357,7 +364,7 @@
             let mat = cv.imread(videoFrame);
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
-            let dictionary = new cv.Dictionary(cv.DICT_4X4_50);
+            let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(mat, cornersList, ids);
