@@ -126,6 +126,30 @@
             27: { img: "map_coop_id20/map_coop_id20.png", mask: "map_coop_id20/map_coop_id20.png" }
         };
 
+        const SOUND_OPTIONS = {
+            "Sparse live bottom": [
+                "Sounds_VF/BASIC_v3/BASIC-BASIC-sparse-live-8bars.wav",
+                "Sounds_VF/COMPLEX/HabitatSynthSounds v4 C Short Loop - Sparse Live Bottom.wav",
+                "Sounds_VF/SPEECH_US_v1/Sparse-100percent-USA_v1.aif"
+            ],
+            "Dense live bottom": [
+                "Sounds_VF/BASIC_v3/BASIC-BASIC-dense-live-8bars-v3.wav",
+                "Sounds_VF/COMPLEX/HabitatSynthSounds v4 C Short Loop - Dense Live Bottom.wav",
+                "Sounds_VF/SPEECH_US_v1/Dense-100percent-USA_v1.aif"
+            ],
+            "Flat sand": [
+                "Sounds_VF/BASIC_v3/BASIC-BASIC-flat-sand-8bars-v3.wav",
+                "Sounds_VF/COMPLEX/HabitatSynthSounds v4 C Short Loop - Flat Sand.wav",
+                "Sounds_VF/SPEECH_US_v1/Flat-100percent-USA_v1.aif"
+            ],
+            "Rippled sand": [
+                "Sounds_VF/BASIC_v3/BASIC-BASIC-rippled-sand-8bars-v3.wav",
+                "Sounds_VF/COMPLEX/HabitatSynthSounds v4 C Short Loop - Rippled Sand.wav",
+                "Sounds_VF/SPEECH_US_v1/Rippled-100percent-USA_v1.aif"
+            ]
+            
+        };
+
         let last_marker_id = null;
         const maskCanvas = document.createElement('canvas');
         const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
@@ -171,7 +195,7 @@
                 if (["1", "2", "3"].includes(e.key)) {
                     selectedOptions[hab] = parseInt(e.key) - 1;
                     document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
-                    // In a real setup, you'd map these to the complex paths in your Python script [cite: 5, 6]
+                    // In a real setup, you'd map these to the complex paths in your Python script 
                     playSound(`sounds/${hab.replace(/ /g, "_")}_option${e.key}.wav`);
                 }
                 if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
