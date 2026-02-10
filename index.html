@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habitat Interactive Study - Updated</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; background: #1e1e1e; color: white; overflow: hidden; }
+        #setup-screen { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #1e1e1e; z-index: 100; text-align: center; }
+        #game-container { display: flex; width: 100vw; height: 100vh; }
+        canvas, video { width: 50%; height: auto; border: 1px solid #444; object-fit: contain; }
+        .btn { padding: 15px 30px; font-size: 20px; cursor: pointer; background: #00caff; border: none; border-radius: 8px; font-weight: bold; margin: 10px; }
+        #ui-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 15px; border-radius: 10px; }
+        .hidden { display: none !important; }
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 30, 30, 0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200; /* Stays above everything */
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #444;
+            border-top: 5px solid #00caff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .btn-small { padding: 5px 10px; font-size: 14px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; }
+        #calib-panel {
+            position: absolute; top: 20px; right: 20px; background: rgba(0,0,0,0.8);
+            padding: 15px; border-radius: 10px; display: none; z-index: 150;
+        }
+        .calib-row { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p>Loading Computer Vision AI...</p>
+    </div>
+
+    <div id="setup-screen">
+        <h1 id="menu-title">Habitat Sound Selection</h1>
+        <div id="color-preview" style="width: 120px; height: 120px; margin: 20px; border: 3px solid white; border-radius: 10px;"></div>
+        <p id="menu-instructions">Press [1, 2, 3] to preview sounds. Press [Enter] to confirm.</p>
+        <div id="selection-status" style="margin-bottom: 20px; color: #00caff;"></div>
+        <button class="btn" id="start-btn" class="hidden">BEGIN ACTIVITY</button>
+    </div>
+
+    <div id="calib-panel">
+        <h3>Map Offset</h3>
+        <div class="calib-row">
+            <span>Horizontal:</span>
+            <input type="range" id="off-x" min="-200" max="200" value="0" oninput="updateOffsets()">
+        </div>
+        <div class="calib-row">
+            <span>Vertical:</span>
+            <input type="range" id="off-y" min="-200" max="200" value="0" oninput="updateOffsets()">
+        </div>
+        <div class="calib-row">
+            <span>Scale:</span>
+            <input type="range" id="off-s" min="0.5" max="2.0" step="0.1" value="1.0" oninput="updateOffsets()">
+        </div>
+        <button class="btn-small" onclick="toggleCalibration()">Close</button>
+    </div>
+
+    <div id="game-container" class="hidden">
+        <video id="input_video" style="display:none;"></video>
+        <canvas id="cam_canvas"></canvas>
+        <canvas id="map_canvas"></canvas>
+        <div id="ui-bar">
+            <span id="status-text">Detecting...</span>
+            <button id="calib-btn" class="btn-small" onclick="toggleCalibration()">🔧 Calibrate</button>
+            <button onclick="downloadCSV()" style="margin-left: 20px; cursor:pointer;">Download Logs</button>
+        </div>
+    </div>
+
+    <script>
+        // --- CONFIG & ASSETS (From Python script) ---
+        const HABITATS = ["Sparse live bottom", "Dense live bottom", "Flat sand", "Rippled sand"];
+        const UI_COLORS = { "Sparse live bottom": "#5FFEC9", "Dense live bottom": "#004434", "Flat sand": "#FE5954", "Rippled sand": "#FCE5B9" };
+        
+        // Match the specific naming conventions in your Python DESCRIPTIONS and SOUND_OPTIONS [cite: 4, 5, 6]
+        const DESCRIPTIONS = {
+            "Sparse live bottom": "sounds/Habitat_Legend-NarratorONLY-Sparse_Live_Bottom.wav",
+            "Dense live bottom": "sounds/Habitat_Legend-NarratorONLY-Dense_Live_Bottom.wav",
+            "Flat sand": "sounds/Habitat_Legend-NarratorONLY-Flat_Sand.wav",
+            "Rippled sand": "sounds/Habitat_Legend-NarratorONLY-Rippled_Sand.wav"
+        };
+
+        let phase = "SELECTION";
+        let currentHabIdx = 0;
+        let selectedOptions = {}; // Stores { Habitat: OptionIndex } 
+        let logs = []; // For CSV data collection 
+        
+        let activeAudio = null;
+        let lastDetectedHabitat = null;
+
+        let cvReady = false; // The library isn't ready yet
+
+        // --- MASK PREPARATION (Pixel-Perfect Collision) ---
+        const MAP_CONFIG = {
+            11: { img: "craved_map/craved_map1.jpeg", mask: "craved_map/craved_map1.jpeg" },
+            9:  { img: "craved_map2/Frame 7_id9.png", mask: "craved_map2/Frame7_id9.png" },
+            3:  { img: "craved_map3/Frame 8_id8.png", mask: "craved_map3/Frame8_id8.png" },
+            4:  { img: "map_6x4/map_6x4.jpeg",       mask: "map_6x4/map_6x4.jpeg" },
+            27: { img: "map_coop_id20/map_coop_id20.png", mask: "map_coop_id20/map_coop_id20.png" }
+        };
+
+        let last_marker_id = null;
+        const maskCanvas = document.createElement('canvas');
+        const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
+
+        function onOpenCvReady() {
+            cvReady = true;
+            console.log("OpenCV is fully loaded and ready!");
+            // Hide the loading overlay so the user can see the Selection menu
+            const loader = document.getElementById('loading-overlay');
+            if (loader) {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.classList.add('hidden'), 500); // Smooth fade out
+            }
+        }
+
+        let calibration = { x: 0, y: 0, scale: 1.0 };
+        let calibMode = false;
+
+        function toggleCalibration() {
+            calibMode = !calibMode;
+            document.getElementById('calib-panel').style.display = calibMode ? 'block' : 'none';
+        }
+
+        function updateOffsets() {
+            calibration.x = parseInt(document.getElementById('off-x').value);
+            calibration.y = parseInt(document.getElementById('off-y').value);
+            calibration.scale = parseFloat(document.getElementById('off-s').value);
+        }
+
+        // --- SELECTION UI LOGIC ---
+        function updateMenu() {
+            const hab = HABITATS[currentHabIdx];
+            document.getElementById('menu-title').innerText = `Select Sound: ${hab}`;
+            document.getElementById('color-preview').style.backgroundColor = UI_COLORS[hab];
+            document.getElementById('selection-status').innerText = selectedOptions[hab] ? `Current: Option ${parseInt(selectedOptions[hab])+1}` : "No sound selected yet";
+            
+            playSound(DESCRIPTIONS[hab]); // Auto-play narrator 
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (phase === "SELECTION") {
+                const hab = HABITATS[currentHabIdx];
+                if (["1", "2", "3"].includes(e.key)) {
+                    selectedOptions[hab] = parseInt(e.key) - 1;
+                    document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
+                    // In a real setup, you'd map these to the complex paths in your Python script [cite: 5, 6]
+                    playSound(`sounds/${hab.replace(/ /g, "_")}_option${e.key}.wav`);
+                }
+                if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
+                    if (currentHabIdx < HABITATS.length - 1) {
+                        currentHabIdx++;
+                        updateMenu();
+                    } else {
+                        document.getElementById('start-btn').classList.remove('hidden');
+                        document.getElementById('menu-instructions').innerText = "All sounds selected. Click below to begin.";
+                    }
+                }
+            }
+        });
+
+        // --- DATA LOGGING  ---
+        function logInteraction(habitat, choice) {
+            logs.push({
+                timestamp: new Date().toLocaleString(),
+                habitat: habitat,
+                choice: choice
+            });
+        }
+
+        function downloadCSV() {
+            let csv = "Timestamp,Habitat,Choice\n";
+            logs.forEach(row => { csv += `${row.timestamp},${row.habitat},${row.choice}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `study_log_${Date.now()}.csv`);
+            a.click();
+        }
+
+        // --- COMPUTER VISION ACTIVITY ---
+        function playSound(file, loop = false) {
+            if (activeAudio) activeAudio.pause();
+            activeAudio = new Audio(file);
+            activeAudio.loop = loop;
+            activeAudio.play().catch(e => console.log("Audio block", e));
+        }
+
+        const videoElement = document.getElementById('input_video');
+        const camCanvas = document.getElementById('cam_canvas');
+        const mapCanvas = document.getElementById('map_canvas');
+        const camCtx = camCanvas.getContext('2d');
+        const mapCtx = mapCanvas.getContext('2d');
+        const mapImg = new Image();
+        mapImg.src = 'craved_map1.jpeg';
+
+        function startActivity() {
+            phase = "ACTIVITY";
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            
+            maskCanvas.width = 640; maskCanvas.height = 480;
+            maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+
+            const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+            hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
+            hands.onResults(onResults);
+
+            const camera = new Camera(videoElement, {
+                onFrame: async () => { await hands.send({image: videoElement}); },
+                width: 640, height: 480
+            });
+            camera.start();
+        }
+
+        function onResults(results) {
+            if (cvReady) {
+                detectMarkers(results.image);
+            }
+
+            camCtx.save();
+            camCtx.clearRect(0, 0, 640, 480);
+            camCtx.drawImage(results.image, 0, 0, 640, 480);
+            
+            mapCtx.clearRect(0, 0, 640, 480);
+            mapCtx.drawImage(mapImg, 0, 0, 640, 480);
+
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const tip = landmarks[8]; 
+                const x = tip.x * 640;
+                const y = tip.y * 480;
+
+                drawPointer(camCtx, x, y, "lime");
+                drawPointer(mapCtx, x, y, "magenta");
+                processCollision(x, y);
+            } else {
+                if (activeAudio && phase === "ACTIVITY") activeAudio.pause();
+                lastDetectedHabitat = null;
+            }
+            camCtx.restore();
+        }
+
+        function drawPointer(ctx, x, y, color) {
+            ctx.beginPath();
+            ctx.arc(x, y, 15, 0, 2 * Math.PI);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+
+        // --- PIXEL COLLISION LOGIC  ---
+        function processCollision(fingerX, fingerY) {
+            if (!homographyMatrix || !maskLoaded) return;
+
+            let srcPtData = new Float32Array([fingerX, fingerY]);
+            let pt = cv.matFromArray(1, 1, cv.CV_32FC2, srcPtData);
+            let transformedPt = new cv.Mat();
+
+            cv.perspectiveTransform(pt, transformedPt, homographyMatrix);
+
+            let mapX = transformedPt.data32F[0];
+            let mapY = transformedPt.data32F[1];
+
+
+            if (mapX >= 0 && mapX < 640 && mapY >= 0 && mapY < 480) {
+                const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
+                const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+                
+                const colorMap = {
+                    "rgb(95,254,201)": "Sparse live bottom",
+                    "rgb(0,68,52)": "Dense live bottom",
+                    "rgb(254,89,84)": "Flat sand",
+                    "rgb(252,229,185)": "Rippled sand"
+                };
+
+                let detected = colorMap[Object.keys(colorMap).find(key => key.replace(/\s/g,'') === rgb.replace(/\s/g,''))] || null;
+
+                if (detected && detected !== lastDetectedHabitat) {
+                    const choice = selectedOptions[detected] + 1;
+                    playSound(`sounds/${detected.replace(/ /g, "_")}_option${choice}.wav`, true);
+                    document.getElementById('status-text').innerText = `Habitat: ${detected}`;
+                    logInteraction(detected, choice);
+                    lastDetectedHabitat = detected;
+                }
+            }
+
+            pt.delete(); transformedPt.delete();
+        }
+
+        document.getElementById('start-btn').onclick = startActivity;
+        updateMenu();
+
+        let homographyMatrix = null;
+        const maskImg = new Image(); // Ensure this is globally defined
+        let maskLoaded = false;
+
+        maskImg.onload = () => {
+            maskLoaded = true;
+            maskCanvas.width = 640; 
+            maskCanvas.height = 480;
+            maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+        };
+
+        function detectMarkers(videoFrame) {
+            let mat = cv.imread(videoFrame);
+            let ids = new cv.Mat();
+            let cornersList = new cv.MarkerCornerList();
+            let dictionary = new cv.Dictionary(cv.DICT_4X4_50);
+            let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
+
+            detector.detect(mat, cornersList, ids);
+
+            if (ids.rows > 0) {
+                let id = ids.data32S[0]; // Get the first detected ID
+                let markerCorners = cornersList.get(0);
+                let calib_pts;
+                if ([3, 9, 11].includes(id)) {
+                    let size = (id !== 11) ? 490 : 277;
+                    // Define the 4 corners of the map relative to this marker size
+                    calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
+                } else if ([4, 21].includes(id)) {
+                    calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
+                } else if ([20, 22, 27].includes(id)) {
+                    // Matching coordinates from Python source [cite: 37, 38]
+                    calib_pts = [640-535, 580, 640-182, 580, 640-182, 934, 640-535, 934];
+                }
+
+                if (calib_pts) {
+
+                    let offset_pts = calib_pts.map((val, idx) => {
+                        if (idx % 2 === 0) return (val * calibration.scale) + calibration.x; // Adjust X
+                        return (val * calibration.scale) + calibration.y; // Adjust Y
+                    });
+                    // let srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, markerCorners);
+                    let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                    
+                    // Calculate and store Homography [cite: 38, 39]
+                    if (homographyMatrix) homographyMatrix.delete(); // Clean old matrix
+                    homographyMatrix = cv.findHomography(markerCorners, dstPts);
+
+                    dstPts.delete();
+                }
+
+                // Map switching logic
+                if (MAP_CONFIG[id] && id !== last_marker_id) {
+                    last_marker_id = id;
+                    maskLoaded = false;
+                    mapImg.src = MAP_CONFIG[id].img;
+                    maskImg.src = MAP_CONFIG[id].mask;
+                }
+            }
+
+            mat.delete(); ids.delete(); cornersList.delete();
+            dictionary.delete(); detector.delete();
+        }
+
+    </script>
+</body>
+</html>
