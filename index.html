@@ -396,7 +396,7 @@
         const videoElement = document.getElementById('input_video');
         const camCanvas = document.getElementById('cam_canvas');
         const mapCanvas = document.getElementById('map_canvas');
-        const camCtx = camCanvas.getContext('2d');
+        const camCtx = camCanvas.getContext('2d', { willReadFrequently: true });
         const mapCtx = mapCanvas.getContext('2d');
         const mapImg = new Image();
         mapImg.src = 'craved_map1.jpeg';
@@ -485,7 +485,7 @@
             if (cvReady) {
                 try {
                     // Using results.image directly from MediaPipe
-                    detectMarkers(results.image);
+                    // detectMarkers(results.image);
                 } catch (err) {
                     console.warn("CV Processing error:", err);
                 }
