@@ -216,22 +216,14 @@
                 const hab = HABITATS[currentHabIdx];
                 const key = e.key.toLowerCase();
 
-                if (key === "r") {
-                    if (activeAudio) {
-                        activeAudio.pause();
-                        activeAudio.currentTime = 0; // Reset to start
-                        document.getElementById('selection-status').innerText = "Description skipped.";
-                    }
+                if (key === "r" && activeAudio) {
+                    activeAudio.pause();
                 }
                 
-                if (["1", "2", "3"].includes(e.key)) {
-                    const optionIdx = parseInt(e.key) - 1;
+                if (["1", "2", "3"].includes(key)) {
+                    const optionIdx = parseInt(key) - 1;
                     selectedOptions[hab] = optionIdx;
-                    document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
-                    
-                    // Play from the SOUND_OPTIONS list
-                    const soundFile = SOUND_OPTIONS[hab][optionIdx];
-                    playSound(soundFile);
+                    playSound(SOUND_OPTIONS[hab][optionIdx]);
                 }
 
                 if (key === "enter") {
@@ -240,37 +232,80 @@
                             currentHabIdx++;
                             updateMenu();
                         } else {
-                            // FINAL VALIDATION: Check if ALL habitats have been selected
                             const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
-                            
                             if (allSelected) {
+                                // --- FIX: STOP AUDIO ONCE DONE ---
+                                if (activeAudio) activeAudio.pause();
+                                
                                 document.getElementById('start-btn').classList.remove('hidden');
-                                document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
-                                document.getElementById('selection-status').innerText = "Selection Complete ✅";
+                                document.getElementById('menu-instructions').innerText = "All habitats configured.";
                             }
                         }
-                    } else {
-                        document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
                     }
                 }
-
-                // if (e.key === "Enter") {
-                //     // Check if they made a selection for the CURRENT habitat before moving on
-                //     if (selectedOptions[hab] !== undefined) {
-                //         if (currentHabIdx < HABITATS.length - 1) {
-                //             currentHabIdx++;
-                //             updateMenu();
-                //         } else {
-                //             // They've reached the end. Show the button!
-                //             document.getElementById('start-btn').classList.remove('hidden');
-                //             document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
-                //         }
-                //     } else {
-                //         document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
-                //     }
-                // }
             }
         });
+
+        // window.addEventListener('keydown', (e) => {
+        //     if (phase === "SELECTION") {
+        //         const hab = HABITATS[currentHabIdx];
+        //         const key = e.key.toLowerCase();
+
+        //         if (key === "r") {
+        //             if (activeAudio) {
+        //                 activeAudio.pause();
+        //                 activeAudio.currentTime = 0; // Reset to start
+        //                 document.getElementById('selection-status').innerText = "Description skipped.";
+        //             }
+        //         }
+                
+        //         if (["1", "2", "3"].includes(e.key)) {
+        //             const optionIdx = parseInt(e.key) - 1;
+        //             selectedOptions[hab] = optionIdx;
+        //             document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
+                    
+        //             // Play from the SOUND_OPTIONS list
+        //             const soundFile = SOUND_OPTIONS[hab][optionIdx];
+        //             playSound(soundFile);
+        //         }
+
+        //         if (key === "enter") {
+        //             if (selectedOptions[hab] !== undefined) {
+        //                 if (currentHabIdx < HABITATS.length - 1) {
+        //                     currentHabIdx++;
+        //                     updateMenu();
+        //                 } else {
+        //                     // FINAL VALIDATION: Check if ALL habitats have been selected
+        //                     const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
+                            
+        //                     if (allSelected) {
+        //                         document.getElementById('start-btn').classList.remove('hidden');
+        //                         document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+        //                         document.getElementById('selection-status').innerText = "Selection Complete ✅";
+        //                     }
+        //                 }
+        //             } else {
+        //                 document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
+        //             }
+        //         }
+
+        //         // if (e.key === "Enter") {
+        //         //     // Check if they made a selection for the CURRENT habitat before moving on
+        //         //     if (selectedOptions[hab] !== undefined) {
+        //         //         if (currentHabIdx < HABITATS.length - 1) {
+        //         //             currentHabIdx++;
+        //         //             updateMenu();
+        //         //         } else {
+        //         //             // They've reached the end. Show the button!
+        //         //             document.getElementById('start-btn').classList.remove('hidden');
+        //         //             document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+        //         //         }
+        //         //     } else {
+        //         //         document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
+        //         //     }
+        //         // }
+        //     }
+        // });
 
         // window.addEventListener('keydown', (e) => {
         //     if (phase === "SELECTION") {
@@ -438,39 +473,77 @@
         }
 
         function onResults(results) {
-            // 1. Always draw the camera feed first so it's never black
+            // 1. Force the video to draw every single frame (prevent freezing)
             camCtx.save();
-            camCtx.clearRect(0, 0, camCanvas.width, camCanvas.height);
-            camCtx.drawImage(results.image, 0, 0, camCanvas.width, camCanvas.height);
+            camCtx.clearRect(0, 0, 640, 480);
+            camCtx.drawImage(results.image, 0, 0, 640, 480);
             
-            // 2. Draw the Map
-            mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-            mapCtx.drawImage(mapImg, 0, 0, mapCanvas.width, mapCanvas.height);
+            mapCtx.clearRect(0, 0, 640, 480);
+            mapCtx.drawImage(mapImg, 0, 0, 640, 480);
 
-            // 3. Process markers if OpenCV is ready
+            // 2. Wrap CV in a try/catch so a crash doesn't stop the camera
             if (cvReady) {
-                detectMarkers(results.image);
+                try {
+                    // Using results.image directly from MediaPipe
+                    detectMarkers(results.image);
+                } catch (err) {
+                    console.warn("CV Processing error:", err);
+                }
             }
 
-            // 4. Handle Hand Landmarks
+            // 3. Hand Tracking
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
                 const tip = landmarks[8]; 
-                const x = tip.x * camCanvas.width;
-                const y = tip.y * camCanvas.height;
+                const x = tip.x * 640;
+                const y = tip.y * 480;
 
                 drawPointer(camCtx, x, y, "lime");
                 drawPointer(mapCtx, x, y, "magenta");
                 processCollision(x, y);
             } else {
-                if (activeAudio && phase === "ACTIVITY") {
-                    // Only pause if it's a looping habitat sound, not the narrator
-                    if (activeAudio.loop) activeAudio.pause();
+                if (activeAudio && phase === "ACTIVITY" && activeAudio.loop) {
+                    activeAudio.pause();
                 }
                 lastDetectedHabitat = null;
             }
             camCtx.restore();
         }
+
+        // function onResults(results) {
+        //     // 1. Always draw the camera feed first so it's never black
+        //     camCtx.save();
+        //     camCtx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+        //     camCtx.drawImage(results.image, 0, 0, camCanvas.width, camCanvas.height);
+            
+        //     // 2. Draw the Map
+        //     mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+        //     mapCtx.drawImage(mapImg, 0, 0, mapCanvas.width, mapCanvas.height);
+
+        //     // 3. Process markers if OpenCV is ready
+        //     if (cvReady) {
+        //         detectMarkers(results.image);
+        //     }
+
+        //     // 4. Handle Hand Landmarks
+        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        //         const landmarks = results.multiHandLandmarks[0];
+        //         const tip = landmarks[8]; 
+        //         const x = tip.x * camCanvas.width;
+        //         const y = tip.y * camCanvas.height;
+
+        //         drawPointer(camCtx, x, y, "lime");
+        //         drawPointer(mapCtx, x, y, "magenta");
+        //         processCollision(x, y);
+        //     } else {
+        //         if (activeAudio && phase === "ACTIVITY") {
+        //             // Only pause if it's a looping habitat sound, not the narrator
+        //             if (activeAudio.loop) activeAudio.pause();
+        //         }
+        //         lastDetectedHabitat = null;
+        //     }
+        //     camCtx.restore();
+        // }
 
         function drawPointer(ctx, x, y, color) {
             ctx.beginPath();
@@ -532,58 +605,111 @@
         };
 
         function detectMarkers(videoFrame) {
+            // Check if videoFrame is valid for OpenCV
+            if (!videoFrame || videoFrame.width === 0) return;
+
             let mat = cv.imread(videoFrame);
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
-            // let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
             let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(mat, cornersList, ids);
 
             if (ids.rows > 0) {
-                let id = ids.data32S[0]; // Get the first detected ID
+                let id = ids.data32S[0];
                 let markerCorners = cornersList.get(0);
-                let calib_pts;
+                let calib_pts = null;
+
+                // Ensure we match marker IDs to calibration points
                 if ([3, 9, 11].includes(id)) {
                     let size = (id !== 11) ? 490 : 277;
-                    // Define the 4 corners of the map relative to this marker size
                     calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
                 } else if ([4, 21].includes(id)) {
                     calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
                 } else if ([20, 22, 27].includes(id)) {
-                    // Matching coordinates from Python source [cite: 37, 38]
                     calib_pts = [640-535, 580, 640-182, 580, 640-182, 934, 640-535, 934];
                 }
 
                 if (calib_pts) {
-
                     let offset_pts = calib_pts.map((val, idx) => {
-                        if (idx % 2 === 0) return (val * calibration.scale) + calibration.x; // Adjust X
-                        return (val * calibration.scale) + calibration.y; // Adjust Y
+                        if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
+                        return (val * calibration.scale) + calibration.y;
                     });
-                    // let srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, markerCorners);
+                    
                     let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
                     
-                    // Calculate and store Homography [cite: 38, 39]
-                    if (homographyMatrix) homographyMatrix.delete(); // Clean old matrix
+                    if (homographyMatrix) homographyMatrix.delete();
                     homographyMatrix = cv.findHomography(markerCorners, dstPts);
 
                     dstPts.delete();
                 }
 
-                // Map switching logic
                 if (MAP_CONFIG[id] && id !== last_marker_id) {
                     last_marker_id = id;
-                    maskLoaded = false;
                     mapImg.src = MAP_CONFIG[id].img;
                     maskImg.src = MAP_CONFIG[id].mask;
                 }
             }
 
+            // CLEANUP: Essential to prevent memory leaks that cause freezes
             mat.delete(); ids.delete(); cornersList.delete();
             dictionary.delete(); detector.delete();
         }
+
+        // function detectMarkers(videoFrame) {
+        //     let mat = cv.imread(videoFrame);
+        //     let ids = new cv.Mat();
+        //     let cornersList = new cv.MarkerCornerList();
+        //     // let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
+        //     let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
+        //     let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
+
+        //     detector.detect(mat, cornersList, ids);
+
+        //     if (ids.rows > 0) {
+        //         let id = ids.data32S[0]; // Get the first detected ID
+        //         let markerCorners = cornersList.get(0);
+        //         let calib_pts;
+        //         if ([3, 9, 11].includes(id)) {
+        //             let size = (id !== 11) ? 490 : 277;
+        //             // Define the 4 corners of the map relative to this marker size
+        //             calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
+        //         } else if ([4, 21].includes(id)) {
+        //             calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
+        //         } else if ([20, 22, 27].includes(id)) {
+        //             // Matching coordinates from Python source [cite: 37, 38]
+        //             calib_pts = [640-535, 580, 640-182, 580, 640-182, 934, 640-535, 934];
+        //         }
+
+        //         if (calib_pts) {
+
+        //             let offset_pts = calib_pts.map((val, idx) => {
+        //                 if (idx % 2 === 0) return (val * calibration.scale) + calibration.x; // Adjust X
+        //                 return (val * calibration.scale) + calibration.y; // Adjust Y
+        //             });
+        //             // let srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, markerCorners);
+        //             let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                    
+        //             // Calculate and store Homography [cite: 38, 39]
+        //             if (homographyMatrix) homographyMatrix.delete(); // Clean old matrix
+        //             homographyMatrix = cv.findHomography(markerCorners, dstPts);
+
+        //             dstPts.delete();
+        //         }
+
+        //         // Map switching logic
+        //         if (MAP_CONFIG[id] && id !== last_marker_id) {
+        //             last_marker_id = id;
+        //             maskLoaded = false;
+        //             mapImg.src = MAP_CONFIG[id].img;
+        //             maskImg.src = MAP_CONFIG[id].mask;
+        //         }
+        //     }
+
+        //     mat.delete(); ids.delete(); cornersList.delete();
+        //     dictionary.delete(); detector.delete();
+        // }
 
     </script>
 </body>
