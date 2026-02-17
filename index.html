@@ -473,42 +473,71 @@
         }
 
         function onResults(results) {
-            // 1. Force the video to draw every single frame (prevent freezing)
+            // 1. Draw camera first (independent of map)
             camCtx.save();
             camCtx.clearRect(0, 0, 640, 480);
             camCtx.drawImage(results.image, 0, 0, 640, 480);
             
-            mapCtx.clearRect(0, 0, 640, 480);
-            mapCtx.drawImage(mapImg, 0, 0, 640, 480);
+            // 2. ONLY draw the map if it's successfully loaded
+            // .complete checks if it's done; .naturalWidth > 0 ensures it's not a 404
+            if (mapImg.complete && mapImg.naturalWidth > 0) {
+                mapCtx.clearRect(0, 0, 640, 480);
+                mapCtx.drawImage(mapImg, 0, 0, 640, 480);
+            } else {
+                // Optional: show a loading message on the map canvas
+                mapCtx.fillStyle = "white";
+                mapCtx.fillText("Loading Map Asset...", 20, 20);
+            }
 
-            // 2. Wrap CV in a try/catch so a crash doesn't stop the camera
+            // 3. Continue with AI logic
             if (cvReady) {
                 try {
-                    // Using results.image directly from MediaPipe
-                    // detectMarkers(results.image);
+                    detectMarkers(results.image);
                 } catch (err) {
-                    console.warn("CV Processing error:", err);
+                    console.error("CV Error:", err);
                 }
             }
-
-            // 3. Hand Tracking
-            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const tip = landmarks[8]; 
-                const x = tip.x * 640;
-                const y = tip.y * 480;
-
-                drawPointer(camCtx, x, y, "lime");
-                drawPointer(mapCtx, x, y, "magenta");
-                processCollision(x, y);
-            } else {
-                if (activeAudio && phase === "ACTIVITY" && activeAudio.loop) {
-                    activeAudio.pause();
-                }
-                lastDetectedHabitat = null;
-            }
+            // ... rest of your hand tracking code ...
             camCtx.restore();
         }
+
+        // function onResults(results) {
+        //     // 1. Force the video to draw every single frame (prevent freezing)
+        //     camCtx.save();
+        //     camCtx.clearRect(0, 0, 640, 480);
+        //     camCtx.drawImage(results.image, 0, 0, 640, 480);
+            
+        //     mapCtx.clearRect(0, 0, 640, 480);
+        //     mapCtx.drawImage(mapImg, 0, 0, 640, 480);
+
+        //     // 2. Wrap CV in a try/catch so a crash doesn't stop the camera
+        //     if (cvReady) {
+        //         try {
+        //             // Using results.image directly from MediaPipe
+        //             // detectMarkers(results.image);
+        //         } catch (err) {
+        //             console.warn("CV Processing error:", err);
+        //         }
+        //     }
+
+        //     // 3. Hand Tracking
+        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        //         const landmarks = results.multiHandLandmarks[0];
+        //         const tip = landmarks[8]; 
+        //         const x = tip.x * 640;
+        //         const y = tip.y * 480;
+
+        //         drawPointer(camCtx, x, y, "lime");
+        //         drawPointer(mapCtx, x, y, "magenta");
+        //         processCollision(x, y);
+        //     } else {
+        //         if (activeAudio && phase === "ACTIVITY" && activeAudio.loop) {
+        //             activeAudio.pause();
+        //         }
+        //         lastDetectedHabitat = null;
+        //     }
+        //     camCtx.restore();
+        // }
 
         // function onResults(results) {
         //     // 1. Always draw the camera feed first so it's never black
