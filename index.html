@@ -448,25 +448,50 @@
         //     camCtx.restore();
         // }
 
+        // function startActivity() {
+        //     phase = "ACTIVITY";
+        //     document.getElementById('setup-screen').classList.add('hidden');
+        //     document.getElementById('game-container').classList.remove('hidden');
+            
+        //     // Set internal canvas dimensions to match the camera stream
+        //     camCanvas.width = 640; 
+        //     camCanvas.height = 480;
+        //     mapCanvas.width = 640; 
+        //     mapCanvas.height = 480;
+
+        //     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        //     hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
+        //     hands.onResults(onResults);
+
+        //     const camera = new Camera(videoElement, {
+        //         onFrame: async () => { 
+        //             await hands.send({image: videoElement}); 
+        //         },
+        //         width: 640, height: 480
+        //     });
+        //     camera.start();
+        // }
+
         function startActivity() {
             phase = "ACTIVITY";
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-container').classList.remove('hidden');
             
-            // Set internal canvas dimensions to match the camera stream
-            camCanvas.width = 640; 
-            camCanvas.height = 480;
-            mapCanvas.width = 640; 
-            mapCanvas.height = 480;
+            // Ensure the mask canvas matches our coordinate system (640x480)
+            maskCanvas.width = 640; 
+            maskCanvas.height = 480;
+
+            // Redraw the current mask immediately
+            if (maskImg.complete && maskImg.naturalWidth > 0) {
+                maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+            }
 
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
             hands.onResults(onResults);
 
             const camera = new Camera(videoElement, {
-                onFrame: async () => { 
-                    await hands.send({image: videoElement}); 
-                },
+                onFrame: async () => { await hands.send({image: videoElement}); },
                 width: 640, height: 480
             });
             camera.start();
@@ -581,44 +606,91 @@
             ctx.fill();
         }
 
-        // --- PIXEL COLLISION LOGIC  ---
         function processCollision(fingerX, fingerY) {
-            if (!homographyMatrix || !maskLoaded) return;
+            // 1. Safety Checks: Only run if homography and mask context exist
+            if (!homographyMatrix || !maskCtx || !maskLoaded) return;
 
             let srcPtData = new Float32Array([fingerX, fingerY]);
             let pt = cv.matFromArray(1, 1, cv.CV_32FC2, srcPtData);
             let transformedPt = new cv.Mat();
 
-            cv.perspectiveTransform(pt, transformedPt, homographyMatrix);
+            try {
+                cv.perspectiveTransform(pt, transformedPt, homographyMatrix);
 
-            let mapX = transformedPt.data32F[0];
-            let mapY = transformedPt.data32F[1];
+                // 2. Round coordinates to nearest Integer for getImageData
+                let mapX = Math.round(transformedPt.data32F[0]);
+                let mapY = Math.round(transformedPt.data32F[1]);
 
+                // 3. Check bounds before reading pixels
+                if (mapX >= 0 && mapX < 640 && mapY >= 0 && mapY < 480) {
+                    const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
+                    const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+                    
+                    // Your existing colorMap logic...
+                    const colorMap = {
+                        "rgb(95,254,201)": "Sparse live bottom",
+                        "rgb(0,68,52)": "Dense live bottom",
+                        "rgb(254,89,84)": "Flat sand",
+                        "rgb(252,229,185)": "Rippled sand"
+                    };
 
-            if (mapX >= 0 && mapX < 640 && mapY >= 0 && mapY < 480) {
-                const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
-                const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
-                
-                const colorMap = {
-                    "rgb(95,254,201)": "Sparse live bottom",
-                    "rgb(0,68,52)": "Dense live bottom",
-                    "rgb(254,89,84)": "Flat sand",
-                    "rgb(252,229,185)": "Rippled sand"
-                };
+                    let detected = colorMap[rgb]; 
 
-                let detected = colorMap[Object.keys(colorMap).find(key => key.replace(/\s/g,'') === rgb.replace(/\s/g,''))] || null;
-
-                if (detected && detected !== lastDetectedHabitat) {
-                    const choice = selectedOptions[detected] + 1;
-                    playSound(`sounds/${detected.replace(/ /g, "_")}_option${choice}.wav`, true);
-                    document.getElementById('status-text').innerText = `Habitat: ${detected}`;
-                    logInteraction(detected, choice);
-                    lastDetectedHabitat = detected;
+                    if (detected && detected !== lastDetectedHabitat) {
+                        const choice = (selectedOptions[detected] || 0) + 1;
+                        playSound(`sounds/${detected.replace(/ /g, "_")}_option${choice}.wav`, true);
+                        document.getElementById('status-text').innerText = `Habitat: ${detected}`;
+                        logInteraction(detected, choice);
+                        lastDetectedHabitat = detected;
+                    }
                 }
+            } catch (e) {
+                console.error("Collision calculation error:", e);
+            } finally {
+                // Essential cleanup
+                pt.delete(); 
+                transformedPt.delete();
             }
-
-            pt.delete(); transformedPt.delete();
         }
+
+        // --- PIXEL COLLISION LOGIC  ---
+        // function processCollision(fingerX, fingerY) {
+        //     if (!homographyMatrix || !maskLoaded) return;
+
+        //     let srcPtData = new Float32Array([fingerX, fingerY]);
+        //     let pt = cv.matFromArray(1, 1, cv.CV_32FC2, srcPtData);
+        //     let transformedPt = new cv.Mat();
+
+        //     cv.perspectiveTransform(pt, transformedPt, homographyMatrix);
+
+        //     let mapX = transformedPt.data32F[0];
+        //     let mapY = transformedPt.data32F[1];
+
+
+        //     if (mapX >= 0 && mapX < 640 && mapY >= 0 && mapY < 480) {
+        //         const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
+        //         const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
+                
+        //         const colorMap = {
+        //             "rgb(95,254,201)": "Sparse live bottom",
+        //             "rgb(0,68,52)": "Dense live bottom",
+        //             "rgb(254,89,84)": "Flat sand",
+        //             "rgb(252,229,185)": "Rippled sand"
+        //         };
+
+        //         let detected = colorMap[Object.keys(colorMap).find(key => key.replace(/\s/g,'') === rgb.replace(/\s/g,''))] || null;
+
+        //         if (detected && detected !== lastDetectedHabitat) {
+        //             const choice = selectedOptions[detected] + 1;
+        //             playSound(`sounds/${detected.replace(/ /g, "_")}_option${choice}.wav`, true);
+        //             document.getElementById('status-text').innerText = `Habitat: ${detected}`;
+        //             logInteraction(detected, choice);
+        //             lastDetectedHabitat = detected;
+        //         }
+        //     }
+
+        //     pt.delete(); transformedPt.delete();
+        // }
 
         document.getElementById('start-btn').onclick = startActivity;
 
