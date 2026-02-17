@@ -186,11 +186,27 @@
         }
 
         // --- SELECTION UI LOGIC ---
+        // function updateMenu() {
+        //     const hab = HABITATS[currentHabIdx];
+        //     document.getElementById('menu-title').innerText = `Select Sound: ${hab}`;
+        //     document.getElementById('color-preview').style.backgroundColor = UI_COLORS[hab];
+        //     document.getElementById('selection-status').innerText = selectedOptions[hab] ? `Current: Option ${parseInt(selectedOptions[hab])+1}` : "No sound selected yet";
+            
+        //     playSound(DESCRIPTIONS[hab]); // Auto-play narrator 
+        // }
+
         function updateMenu() {
             const hab = HABITATS[currentHabIdx];
             document.getElementById('menu-title').innerText = `Select Sound: ${hab}`;
             document.getElementById('color-preview').style.backgroundColor = UI_COLORS[hab];
-            document.getElementById('selection-status').innerText = selectedOptions[hab] ? `Current: Option ${parseInt(selectedOptions[hab])+1}` : "No sound selected yet";
+            
+            // Show current selection status
+            const currentSelection = selectedOptions[hab];
+            document.getElementById('selection-status').innerText = 
+                currentSelection !== undefined ? `Current: Option ${currentSelection + 1}` : "No sound selected yet";
+            
+            // Hide start button until the very end validation
+            document.getElementById('start-btn').classList.add('hidden');
             
             playSound(DESCRIPTIONS[hab]); // Auto-play narrator 
         }
@@ -198,6 +214,15 @@
         window.addEventListener('keydown', (e) => {
             if (phase === "SELECTION") {
                 const hab = HABITATS[currentHabIdx];
+                const key = e.key.toLowerCase();
+
+                if (key === "r") {
+                    if (activeAudio) {
+                        activeAudio.pause();
+                        activeAudio.currentTime = 0; // Reset to start
+                        document.getElementById('selection-status').innerText = "Description skipped.";
+                    }
+                }
                 
                 if (["1", "2", "3"].includes(e.key)) {
                     const optionIdx = parseInt(e.key) - 1;
@@ -209,21 +234,41 @@
                     playSound(soundFile);
                 }
 
-                if (e.key === "Enter") {
-                    // Check if they made a selection for the CURRENT habitat before moving on
+                if (key === "enter") {
                     if (selectedOptions[hab] !== undefined) {
                         if (currentHabIdx < HABITATS.length - 1) {
                             currentHabIdx++;
                             updateMenu();
                         } else {
-                            // They've reached the end. Show the button!
-                            document.getElementById('start-btn').classList.remove('hidden');
-                            document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+                            // FINAL VALIDATION: Check if ALL habitats have been selected
+                            const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
+                            
+                            if (allSelected) {
+                                document.getElementById('start-btn').classList.remove('hidden');
+                                document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+                                document.getElementById('selection-status').innerText = "Selection Complete ✅";
+                            }
                         }
                     } else {
                         document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
                     }
                 }
+
+                // if (e.key === "Enter") {
+                //     // Check if they made a selection for the CURRENT habitat before moving on
+                //     if (selectedOptions[hab] !== undefined) {
+                //         if (currentHabIdx < HABITATS.length - 1) {
+                //             currentHabIdx++;
+                //             updateMenu();
+                //         } else {
+                //             // They've reached the end. Show the button!
+                //             document.getElementById('start-btn').classList.remove('hidden');
+                //             document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
+                //         }
+                //     } else {
+                //         document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
+                //     }
+                // }
             }
         });
 
@@ -321,48 +366,107 @@
         const mapImg = new Image();
         mapImg.src = 'craved_map1.jpeg';
 
+        // function startActivity() {
+        //     phase = "ACTIVITY";
+        //     document.getElementById('setup-screen').classList.add('hidden');
+        //     document.getElementById('game-container').classList.remove('hidden');
+            
+        //     maskCanvas.width = 640; maskCanvas.height = 480;
+        //     maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+
+        //     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
+        //     hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
+        //     hands.onResults(onResults);
+
+        //     const camera = new Camera(videoElement, {
+        //         onFrame: async () => { await hands.send({image: videoElement}); },
+        //         width: 640, height: 480
+        //     });
+        //     camera.start();
+        // }
+
+        // function onResults(results) {
+        //     if (cvReady) {
+        //         detectMarkers(results.image);
+        //     }
+
+        //     camCtx.save();
+        //     camCtx.clearRect(0, 0, 640, 480);
+        //     camCtx.drawImage(results.image, 0, 0, 640, 480);
+            
+        //     mapCtx.clearRect(0, 0, 640, 480);
+        //     mapCtx.drawImage(mapImg, 0, 0, 640, 480);
+
+        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        //         const landmarks = results.multiHandLandmarks[0];
+        //         const tip = landmarks[8]; 
+        //         const x = tip.x * 640;
+        //         const y = tip.y * 480;
+
+        //         drawPointer(camCtx, x, y, "lime");
+        //         drawPointer(mapCtx, x, y, "magenta");
+        //         processCollision(x, y);
+        //     } else {
+        //         if (activeAudio && phase === "ACTIVITY") activeAudio.pause();
+        //         lastDetectedHabitat = null;
+        //     }
+        //     camCtx.restore();
+        // }
+
         function startActivity() {
             phase = "ACTIVITY";
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-container').classList.remove('hidden');
             
-            maskCanvas.width = 640; maskCanvas.height = 480;
-            maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+            // Set internal canvas dimensions to match the camera stream
+            camCanvas.width = 640; 
+            camCanvas.height = 480;
+            mapCanvas.width = 640; 
+            mapCanvas.height = 480;
 
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
             hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
             hands.onResults(onResults);
 
             const camera = new Camera(videoElement, {
-                onFrame: async () => { await hands.send({image: videoElement}); },
+                onFrame: async () => { 
+                    await hands.send({image: videoElement}); 
+                },
                 width: 640, height: 480
             });
             camera.start();
         }
 
         function onResults(results) {
+            // 1. Always draw the camera feed first so it's never black
+            camCtx.save();
+            camCtx.clearRect(0, 0, camCanvas.width, camCanvas.height);
+            camCtx.drawImage(results.image, 0, 0, camCanvas.width, camCanvas.height);
+            
+            // 2. Draw the Map
+            mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+            mapCtx.drawImage(mapImg, 0, 0, mapCanvas.width, mapCanvas.height);
+
+            // 3. Process markers if OpenCV is ready
             if (cvReady) {
                 detectMarkers(results.image);
             }
 
-            camCtx.save();
-            camCtx.clearRect(0, 0, 640, 480);
-            camCtx.drawImage(results.image, 0, 0, 640, 480);
-            
-            mapCtx.clearRect(0, 0, 640, 480);
-            mapCtx.drawImage(mapImg, 0, 0, 640, 480);
-
+            // 4. Handle Hand Landmarks
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
                 const tip = landmarks[8]; 
-                const x = tip.x * 640;
-                const y = tip.y * 480;
+                const x = tip.x * camCanvas.width;
+                const y = tip.y * camCanvas.height;
 
                 drawPointer(camCtx, x, y, "lime");
                 drawPointer(mapCtx, x, y, "magenta");
                 processCollision(x, y);
             } else {
-                if (activeAudio && phase === "ACTIVITY") activeAudio.pause();
+                if (activeAudio && phase === "ACTIVITY") {
+                    // Only pause if it's a looping habitat sound, not the narrator
+                    if (activeAudio.loop) activeAudio.pause();
+                }
                 lastDetectedHabitat = null;
             }
             camCtx.restore();
