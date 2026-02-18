@@ -490,32 +490,40 @@
         
 
         function detectMarkers(videoFrame) {
-            if (!videoFrame || videoFrame.width === 0) return;
+            if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
 
             let mat = cv.imread(videoFrame);
-            cv.flip(mat, mat, 1);
+            
+            // --- THE FIX ---
+            // Flip the image horizontally (1 = horizontal flip)
+            // This corrects the MediaPipe "Mirror" effect so the marker is readable
+            cv.flip(mat, mat, 1); 
+
+            let gray = new cv.Mat();
+            cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
-            // let dictionary = cv.getPredefinedDictionary(cv.DICT_6X6_250);
-            // let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
+            
+            // Ensure this matches your printed tag (DICT_4X4_50 or DICT_APRILTAG_36h11)
             let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
-            detector.detect(mat, cornersList, ids);
+            detector.detect(gray, cornersList, ids);
 
             if (ids.rows > 0) {
                 let id = ids.data32S[0];
                 let markerCorners = cornersList.get(0);
+                
+                // Since we flipped the 'mat' at the start, 
+                // the coordinates in markerCorners are now correct for a non-mirrored world.
+                
                 let calib_pts = null;
-
-                // Calibration logic
                 if ([0, 3, 9, 11].includes(id)) {
                     let size = (id !== 11) ? 490 : 277;
                     calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
                 } else if ([4, 21].includes(id)) {
                     calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
-                } else if ([20, 22, 27].includes(id)) {
-                    calib_pts = [640-535, 580, 640-182, 580, 640-182, 934, 640-535, 934];
                 }
 
                 if (calib_pts) {
@@ -524,22 +532,23 @@
                         return (val * calibration.scale) + calibration.y;
                     });
                     let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                    
                     if (homographyMatrix) homographyMatrix.delete();
                     homographyMatrix = cv.findHomography(markerCorners, dstPts);
                     dstPts.delete();
                 }
 
-                // TRIGGER MASK SWAP
                 if (MAP_CONFIG[id] && id !== last_marker_id) {
                     last_marker_id = id;
-                    maskLoaded = false; // Reset until new image loads
+                    maskLoaded = false;
                     mapImg.src = MAP_CONFIG[id].img;
-                    maskImg.src = MAP_CONFIG[id].mask; // This triggers maskImg.onload
+                    maskImg.src = MAP_CONFIG[id].mask;
                 }
             }
 
-            mat.delete(); ids.delete(); cornersList.delete();
-            dictionary.delete(); detector.delete();
+            // CLEANUP
+            mat.delete(); gray.delete(); ids.delete(); 
+            cornersList.delete(); dictionary.delete(); detector.delete();
         }
 
         
