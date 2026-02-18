@@ -510,6 +510,7 @@
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(gray, cornersList, ids);
+            console.log("Detecting... Markers found:", ids.rows);
 
             if (ids.rows > 0) {
                 let id = ids.data32S[0];
