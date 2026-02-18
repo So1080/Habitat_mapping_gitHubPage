@@ -495,98 +495,93 @@
         
 
         function detectMarkers(videoFrame) {
-
-            console.log("Looking for markers..."); // Add this
-            if (!videoFrame || videoFrame.width === 0 || !cvReady) {
-                console.log("Detection skipped: cvReady is", cvReady); // Add this
+            console.log("Looking for markers...");
+            
+            // Safety check for OpenCV readiness
+            if (!cvReady) {
+                console.log("Detection skipped: OpenCV not ready");
                 return;
             }
-            // if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
 
-            // let mat = cv.imread(videoFrame);
-            let mat = cv.imread(document.getElementById('cam_canvas'));
-            console.log("mat ok");
-            
-            // --- THE FIX ---
-            // Flip the image horizontally (1 = horizontal flip)
-            // This corrects the MediaPipe "Mirror" effect so the marker is readable
-            // cv.flip(mat, mat, 1); 
+            let mat, gray, ids, cornersList, rejectedPoints, parameters, dictionary;
 
-            let gray = new cv.Mat();
-            cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY,0);
-            console.log("gray ok");
+            try {
+                // 1. Read from Canvas instead of raw frame to ensure data compatibility
+                mat = cv.imread(document.getElementById('cam_canvas'));
+                console.log("mat ok - Channels:", mat.channels());
 
-            // let ids = new cv.Mat();
-            // let cornersList = new cv.MarkerCornerList();
-            // console.log("cornersList ok");
-            let ids = new cv.Mat();
-            console.log("ids ok");
-            let cornersList = new cv.MatVector();
-            console.log("cornersList ok");
-            let rejectedPoints = new cv.MatVector();
-            console.log("rejectedPoints ok");
-            
-            // Ensure this matches your printed tag (DICT_4X4_50 or DICT_APRILTAG_36h11)
-            let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
-            console.log("dict ok");
-            let parameters = new cv.DetectorParameters();
-            parameters.adaptiveThreshWinSizeMin = 3;
-            parameters.adaptiveThreshWinSizeMax = 23;
-            parameters.adaptiveThreshWinSizeStep = 10;
-            // Lower this if the image is blurry
-            parameters.minMarkerPerimeterRate = 0.03; 
+                gray = new cv.Mat();
+                cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
+                console.log("gray ok");
 
-            // let detector = new cv.ArUcoDetector(dictionary, parameters);
-            console.log("param ok");
-
-            // detector.detect(gray, cornersList, ids);
-            cv.detectMarkers(gray, dictionary, cornersList, ids, parameters, rejectedPoints);
-            // console.log("Detecting... Markers found:", ids.rows);
-            console.log("Input Mat size:", mat.cols, "x", mat.rows, "Channels:", mat.channels());
-            console.log("IDs found:", ids.rows);
-
-            if (ids.rows > 0) {
-                let id = ids.data32S[0];
-                let markerCorners = cornersList.get(0);
+                // 2. Initialize necessary containers
+                ids = new cv.Mat();
+                cornersList = new cv.MatVector();
+                rejectedPoints = new cv.MatVector();
                 
-                // Since we flipped the 'mat' at the start, 
-                // the coordinates in markerCorners are now correct for a non-mirrored world.
+                // 3. Setup Dictionary and Parameters
+                dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
+                parameters = new cv.DetectorParameters();
                 
-                let calib_pts = null;
-                if ([0, 3, 9, 11].includes(id)) {
-                    let size = (id !== 11) ? 490 : 277;
-                    calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
-                } else if ([4, 21].includes(id)) {
-                    calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
-                }
+                // Adjust these to help with detection at 640x480
+                parameters.adaptiveThreshWinSizeMin = 3;
+                parameters.adaptiveThreshWinSizeMax = 23;
+                parameters.adaptiveThreshWinSizeStep = 10;
+                console.log("params ok");
 
-                if (calib_pts) {
-                    let offset_pts = calib_pts.map((val, idx) => {
-                        if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
-                        return (val * calibration.scale) + calibration.y;
-                    });
-                    let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                // 4. Perform detection using the global function (more stable in web versions)
+                cv.detectMarkers(gray, dictionary, cornersList, ids, parameters, rejectedPoints);
+                console.log("detector ok - IDs found:", ids.rows);
+
+                if (ids.rows > 0) {
+                    let id = ids.data32S[0];
+                    // Access corners from MatVector
+                    let markerCorners = cornersList.get(0);
                     
-                    if (homographyMatrix) homographyMatrix.delete();
-                    homographyMatrix = cv.findHomography(markerCorners, dstPts);
-                    dstPts.delete();
+                    // ... your calibration and homography logic ...
+                    console.log("Marker Detected ID:", id);
+                    
+                    // Logic for mapping (matching your snippet)
+                    let calib_pts = null;
+                    if ([0, 3, 9, 11].includes(id)) {
+                        let size = (id !== 11) ? 490 : 277;
+                        calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
+                    } else if ([4, 21].includes(id)) {
+                        calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
+                    }
+
+                    if (calib_pts) {
+                        let offset_pts = calib_pts.map((val, idx) => {
+                            if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
+                            return (val * calibration.scale) + calibration.y;
+                        });
+                        let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                        
+                        if (homographyMatrix) homographyMatrix.delete();
+                        homographyMatrix = cv.findHomography(markerCorners, dstPts);
+                        dstPts.delete();
+                    }
+
+                    if (MAP_CONFIG[id] && id !== last_marker_id) {
+                        last_marker_id = id;
+                        maskLoaded = false;
+                        mapImg.src = MAP_CONFIG[id].img;
+                        maskImg.src = MAP_CONFIG[id].mask;
+                    }
                 }
 
-                if (MAP_CONFIG[id] && id !== last_marker_id) {
-                    last_marker_id = id;
-                    maskLoaded = false;
-                    mapImg.src = MAP_CONFIG[id].img;
-                    maskImg.src = MAP_CONFIG[id].mask;
-                }
+            } catch (err) {
+                console.error("Internal Marker Error:", err);
+            } finally {
+                // 5. ESSENTIAL: Delete EVERYTHING to prevent memory-related silent crashes
+                if (mat) mat.delete();
+                if (gray) gray.delete();
+                if (ids) ids.delete();
+                if (cornersList) cornersList.delete();
+                if (rejectedPoints) rejectedPoints.delete();
+                if (parameters) parameters.delete();
+                // Dictionary is a pointer to a static object, usually doesn't need deletion
             }
-           
-
-            // CLEANUP
-            mat.delete();
-            gray.delete();
-            ids.delete(); 
-            cornersList.delete(); dictionary.delete(); detector.delete();
-            parameters.delete();
         }
 
         
