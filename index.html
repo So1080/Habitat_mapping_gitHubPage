@@ -344,6 +344,39 @@
             camera.start();
         }
 
+        function drawCalibrationOverlay(ctx) {
+            if (!homographyMatrix || !cvReady) return;
+
+            try {
+                let invHomography = new cv.Mat();
+                cv.invert(homographyMatrix, invHomography);
+
+                const corners = [{x:0, y:0}, {x:640, y:0}, {x:640, y:480}, {x:0, y:480}];
+                ctx.beginPath();
+                ctx.strokeStyle = "#00ffff"; // Cyan box
+                ctx.lineWidth = 4;
+
+                for (let i = 0; i < corners.length; i++) {
+                    let ptData = new Float32Array([corners[i].x, corners[i].y]);
+                    let pt = cv.matFromArray(1, 1, cv.CV_32FC2, ptData);
+                    let camPt = new cv.Mat();
+                    
+                    cv.perspectiveTransform(pt, camPt, invHomography);
+                    
+                    let px = camPt.data32F[0];
+                    let py = camPt.data32F[1];
+
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+
+                    pt.delete(); camPt.delete();
+                }
+                ctx.closePath();
+                ctx.stroke();
+                invHomography.delete();
+            } catch (e) { /* Ignore transient math errors */ }
+        }
+
         function onResults(results) {
             if (camCanvas.width !== 640) camCanvas.width = 640;
             if (camCanvas.height !== 480) camCanvas.height = 480;
@@ -352,7 +385,7 @@
             camCtx.clearRect(0, 0, 640, 480);
             camCtx.drawImage(results.image, 0, 0, 640, 480);
             
-            // VISUAL FEEDBACK: Draw the calibration box if marker is found
+            // CALL THE OVERLAY HERE
             if (homographyMatrix) drawCalibrationOverlay(camCtx);
 
             if (mapImg.complete && mapImg.naturalWidth > 0) {
@@ -362,24 +395,15 @@
 
             if (cvReady) {
                 try { detectMarkers(results.image); } 
-                catch (err) { console.warn("Marker Detection Error:", err); }
+                catch (err) { console.warn("Marker Error:", err); }
             }
 
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-                const landmarks = results.multiHandLandmarks[0];
-                const x = landmarks[8].x * 640;
-                const y = landmarks[8].y * 480;
-
+                const x = results.multiHandLandmarks[0][8].x * 640;
+                const y = results.multiHandLandmarks[0][8].y * 480;
                 drawPointer(camCtx, x, y, "lime");
                 drawPointer(mapCtx, x, y, "magenta");
-
-                // SAFETY: Check maskCtx directly before calling collision
-                if (homographyMatrix && maskCtx && maskLoaded) {
-                    processCollision(x, y);
-                }
-            } else {
-                if (activeAudio && activeAudio.loop) activeAudio.pause();
-                lastDetectedHabitat = null;
+                if (homographyMatrix && maskLoaded) processCollision(x, y);
             }
             camCtx.restore();
         }
@@ -413,7 +437,6 @@
                     const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
                     const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
                     
-                    // Your existing colorMap logic...
                     const colorMap = {
                         "rgb(95,254,201)": "Sparse live bottom",
                         "rgb(0,68,52)": "Dense live bottom",
@@ -498,47 +521,7 @@
             dictionary.delete(); detector.delete();
         }
 
-        function drawCalibrationOverlay(ctx) {
-            if (!homographyMatrix || !cvReady) return;
-
-            try {
-                // Create an inverse matrix to map from Map-space back to Camera-space
-                let invHomography = new cv.Mat();
-                cv.invert(homographyMatrix, invHomography);
-
-                // The four corners of our 640x480 map
-                const mapCorners = [{x:0, y:0}, {x:640, y:0}, {x:640, y:480}, {x:0, y:480}];
-                
-                ctx.beginPath();
-                ctx.strokeStyle = "#00ffff"; // Cyan
-                ctx.lineWidth = 3;
-
-                for (let i = 0; i < mapCorners.length; i++) {
-                    let ptData = new Float32Array([mapCorners[i].x, mapCorners[i].y]);
-                    let pt = cv.matFromArray(1, 1, cv.CV_32FC2, ptData);
-                    let camPt = new cv.Mat();
-                    
-                    cv.perspectiveTransform(pt, camPt, invHomography);
-                    
-                    let px = camPt.data32F[0];
-                    let py = camPt.data32F[1];
-
-                    if (i === 0) ctx.moveTo(px, py);
-                    else ctx.lineTo(px, py);
-
-                    pt.delete(); camPt.delete();
-                }
-                ctx.closePath();
-                ctx.stroke();
-                
-                ctx.fillStyle = "#00ffff";
-                ctx.fillText("MAP AREA", 10, 20);
-                
-                invHomography.delete();
-            } catch (e) {
-                // If the marker is tilted too sharply, the math might fail briefly
-            }
-        }
+        
 
 
     </script>
