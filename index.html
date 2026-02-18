@@ -491,7 +491,8 @@
 
 
         document.getElementById('start-btn').onclick = startActivity;
-
+        let arucoDict = null;
+        let arucoParams = null;
         
 
         function detectMarkers(videoFrame) {
@@ -503,35 +504,52 @@
                 return;
             }
 
-            let mat, gray, ids, cornersList, rejectedPoints, parameters, dictionary;
+            if (!arucoDict) arucoDict = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
+            if (!arucoParams) {
+                arucoParams = new cv.DetectorParameters();
+                arucoParams.adaptiveThreshWinSizeMin = 3;
+                arucoParams.adaptiveThreshWinSizeMax = 23;
+                arucoParams.adaptiveThreshWinSizeStep = 10;
+            }
+
+            let mat = cv.imread(document.getElementById('cam_canvas'));
+            let gray = new cv.Mat();
+            cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
+            console.log("gray ok");
+
+            let ids = new cv.Mat();
+            let cornersList = new cv.MatVector();
+            let rejectedPoints = new cv.MatVector();
 
             try {
+                cv.detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
+                console.log("Markers detected:", ids.rows);
                 // 1. Read from Canvas instead of raw frame to ensure data compatibility
-                mat = cv.imread(document.getElementById('cam_canvas'));
-                console.log("mat ok - Channels:", mat.channels());
+                // mat = cv.imread(document.getElementById('cam_canvas'));
+                // console.log("mat ok - Channels:", mat.channels());
 
-                gray = new cv.Mat();
-                cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
-                console.log("gray ok");
+                // gray = new cv.Mat();
+                // cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
+                // console.log("gray ok");
 
                 // 2. Initialize necessary containers
-                ids = new cv.Mat();
-                cornersList = new cv.MatVector();
-                rejectedPoints = new cv.MatVector();
+                // ids = new cv.Mat();
+                // cornersList = new cv.MatVector();
+                // rejectedPoints = new cv.MatVector();
                 
                 // 3. Setup Dictionary and Parameters
-                dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
-                parameters = new cv.DetectorParameters();
+                // dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
+                // parameters = new cv.DetectorParameters();
                 
-                // Adjust these to help with detection at 640x480
-                parameters.adaptiveThreshWinSizeMin = 3;
-                parameters.adaptiveThreshWinSizeMax = 23;
-                parameters.adaptiveThreshWinSizeStep = 10;
-                console.log("params ok");
+                // // Adjust these to help with detection at 640x480
+                // parameters.adaptiveThreshWinSizeMin = 3;
+                // parameters.adaptiveThreshWinSizeMax = 23;
+                // parameters.adaptiveThreshWinSizeStep = 10;
+                // console.log("params ok");
 
                 // 4. Perform detection using the global function (more stable in web versions)
-                cv.detectMarkers(gray, dictionary, cornersList, ids, parameters, rejectedPoints);
-                console.log("detector ok - IDs found:", ids.rows);
+                // cv.detectMarkers(gray, dictionary, cornersList, ids, parameters, rejectedPoints);
+                // console.log("detector ok - IDs found:", ids.rows);
 
                 if (ids.rows > 0) {
                     let id = ids.data32S[0];
@@ -579,7 +597,7 @@
                 if (ids) ids.delete();
                 if (cornersList) cornersList.delete();
                 if (rejectedPoints) rejectedPoints.delete();
-                if (parameters) parameters.delete();
+                // if (parameters) parameters.delete();
                 // Dictionary is a pointer to a static object, usually doesn't need deletion
             }
         }
