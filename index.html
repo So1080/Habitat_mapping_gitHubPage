@@ -508,20 +508,29 @@
             // --- THE FIX ---
             // Flip the image horizontally (1 = horizontal flip)
             // This corrects the MediaPipe "Mirror" effect so the marker is readable
-            cv.flip(mat, mat, 1); 
+            // cv.flip(mat, mat, 1); 
 
             let gray = new cv.Mat();
-            cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY);
+            cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY,0);
 
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
             
             // Ensure this matches your printed tag (DICT_4X4_50 or DICT_APRILTAG_36h11)
             let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
-            let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
+            let parameters = new cv.DetectorParameters();
+            parameters.adaptiveThreshWinSizeMin = 3;
+            parameters.adaptiveThreshWinSizeMax = 23;
+            parameters.adaptiveThreshWinSizeStep = 10;
+            // Lower this if the image is blurry
+            parameters.minMarkerPerimeterRate = 0.03; 
+
+            let detector = new cv.ArUcoDetector(dictionary, parameters);
 
             detector.detect(gray, cornersList, ids);
-            console.log("Detecting... Markers found:", ids.rows);
+            // console.log("Detecting... Markers found:", ids.rows);
+            console.log("Input Mat size:", mat.cols, "x", mat.rows, "Channels:", mat.channels());
+            console.log("IDs found:", ids.rows);
 
             if (ids.rows > 0) {
                 let id = ids.data32S[0];
@@ -557,9 +566,12 @@
                     maskImg.src = MAP_CONFIG[id].mask;
                 }
             }
+           
 
             // CLEANUP
-            mat.delete(); gray.delete(); ids.delete(); 
+            mat.delete();
+            gray.delete();
+            ids.delete(); 
             cornersList.delete(); dictionary.delete(); detector.delete();
         }
 
