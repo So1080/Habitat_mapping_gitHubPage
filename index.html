@@ -495,7 +495,9 @@
             let mat = cv.imread(videoFrame);
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
-            let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
+            // let dictionary = cv.getPredefinedDictionary(cv.DICT_6X6_250);
+            // let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
+            let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11));
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(mat, cornersList, ids);
@@ -506,7 +508,7 @@
                 let calib_pts = null;
 
                 // Calibration logic
-                if ([3, 9, 11].includes(id)) {
+                if ([0, 3, 9, 11].includes(id)) {
                     let size = (id !== 11) ? 490 : 277;
                     calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
                 } else if ([4, 21].includes(id)) {
