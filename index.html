@@ -497,7 +497,7 @@
             let cornersList = new cv.MarkerCornerList();
             // let dictionary = cv.getPredefinedDictionary(cv.DICT_6X6_250);
             // let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
-            let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11));
+            let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
             let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
 
             detector.detect(mat, cornersList, ids);
