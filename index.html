@@ -503,7 +503,8 @@
             }
             // if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
 
-            let mat = cv.imread(videoFrame);
+            // let mat = cv.imread(videoFrame);
+            let mat = cv.imread(document.getElementById('cam_canvas'));
             console.log("mat ok");
             
             // --- THE FIX ---
@@ -578,6 +579,7 @@
             gray.delete();
             ids.delete(); 
             cornersList.delete(); dictionary.delete(); detector.delete();
+            parameters.delete();
         }
 
         
