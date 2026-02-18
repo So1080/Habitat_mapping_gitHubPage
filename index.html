@@ -98,6 +98,10 @@
     </div>
 
     <script>
+        console.log("Script execution started");
+
+
+
         // --- CONFIG & ASSETS (From Python script) ---
         const HABITATS = ["Sparse live bottom", "Dense live bottom", "Flat sand", "Rippled sand"];
         const UI_COLORS = { "Sparse live bottom": "#5FFEC9", "Dense live bottom": "#004434", "Flat sand": "#FE5954", "Rippled sand": "#FCE5B9" };
@@ -380,6 +384,7 @@
         }
 
         function onResults(results) {
+            console.log("MediaPipe is sending frames");
             if (camCanvas.width !== 640) camCanvas.width = 640;
             if (camCanvas.height !== 480) camCanvas.height = 480;
 
@@ -490,7 +495,13 @@
         
 
         function detectMarkers(videoFrame) {
-            if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
+
+            console.log("Looking for markers..."); // Add this
+            if (!videoFrame || videoFrame.width === 0 || !cvReady) {
+                console.log("Detection skipped: cvReady is", cvReady); // Add this
+                return;
+            }
+            // if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
 
             let mat = cv.imread(videoFrame);
             
