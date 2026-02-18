@@ -157,6 +157,22 @@
         const maskCanvas = document.createElement('canvas');
         const maskCtx = maskCanvas.getContext('2d', { willReadFrequently: true });
 
+        // --- GLOBAL STATE ---
+        let homographyMatrix = null;
+        let maskLoaded = false;
+
+        // INITIALIZATION FIX: Lock internal resolution immediately
+        maskCanvas.width = 640;
+        maskCanvas.height = 480;
+        const maskImg = new Image();
+
+        maskImg.onload = () => {
+            maskLoaded = true;
+            maskCtx.clearRect(0, 0, 640, 480);
+            maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+        };
+
+
         function onOpenCvReady() {
             cvReady = true;
             console.log("OpenCV is fully loaded and ready!");
@@ -185,15 +201,7 @@
             calibration.scale = parseFloat(document.getElementById('off-s').value);
         }
 
-        // --- SELECTION UI LOGIC ---
-        // function updateMenu() {
-        //     const hab = HABITATS[currentHabIdx];
-        //     document.getElementById('menu-title').innerText = `Select Sound: ${hab}`;
-        //     document.getElementById('color-preview').style.backgroundColor = UI_COLORS[hab];
-        //     document.getElementById('selection-status').innerText = selectedOptions[hab] ? `Current: Option ${parseInt(selectedOptions[hab])+1}` : "No sound selected yet";
-            
-        //     playSound(DESCRIPTIONS[hab]); // Auto-play narrator 
-        // }
+        
 
         function updateMenu() {
             const hab = HABITATS[currentHabIdx];
@@ -246,102 +254,7 @@
             }
         });
 
-        // window.addEventListener('keydown', (e) => {
-        //     if (phase === "SELECTION") {
-        //         const hab = HABITATS[currentHabIdx];
-        //         const key = e.key.toLowerCase();
-
-        //         if (key === "r") {
-        //             if (activeAudio) {
-        //                 activeAudio.pause();
-        //                 activeAudio.currentTime = 0; // Reset to start
-        //                 document.getElementById('selection-status').innerText = "Description skipped.";
-        //             }
-        //         }
-                
-        //         if (["1", "2", "3"].includes(e.key)) {
-        //             const optionIdx = parseInt(e.key) - 1;
-        //             selectedOptions[hab] = optionIdx;
-        //             document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
-                    
-        //             // Play from the SOUND_OPTIONS list
-        //             const soundFile = SOUND_OPTIONS[hab][optionIdx];
-        //             playSound(soundFile);
-        //         }
-
-        //         if (key === "enter") {
-        //             if (selectedOptions[hab] !== undefined) {
-        //                 if (currentHabIdx < HABITATS.length - 1) {
-        //                     currentHabIdx++;
-        //                     updateMenu();
-        //                 } else {
-        //                     // FINAL VALIDATION: Check if ALL habitats have been selected
-        //                     const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
-                            
-        //                     if (allSelected) {
-        //                         document.getElementById('start-btn').classList.remove('hidden');
-        //                         document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
-        //                         document.getElementById('selection-status').innerText = "Selection Complete ✅";
-        //                     }
-        //                 }
-        //             } else {
-        //                 document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
-        //             }
-        //         }
-
-        //         // if (e.key === "Enter") {
-        //         //     // Check if they made a selection for the CURRENT habitat before moving on
-        //         //     if (selectedOptions[hab] !== undefined) {
-        //         //         if (currentHabIdx < HABITATS.length - 1) {
-        //         //             currentHabIdx++;
-        //         //             updateMenu();
-        //         //         } else {
-        //         //             // They've reached the end. Show the button!
-        //         //             document.getElementById('start-btn').classList.remove('hidden');
-        //         //             document.getElementById('menu-instructions').innerText = "All habitats configured. Click BEGIN below.";
-        //         //         }
-        //         //     } else {
-        //         //         document.getElementById('selection-status').innerText = "⚠️ Please select sound 1, 2, or 3 first!";
-        //         //     }
-        //         // }
-        //     }
-        // });
-
-        // window.addEventListener('keydown', (e) => {
-        //     if (phase === "SELECTION") {
-        //         const hab = HABITATS[currentHabIdx];
-                
-        //         if (["1", "2", "3"].includes(e.key)) {
-        //             const optionIdx = parseInt(e.key) - 1;
-        //             selectedOptions[hab] = parseInt(e.key) - 1;
-        //             document.getElementById('selection-status').innerText = `Playing: Option ${e.key}`;
-        //             // In a real setup, you'd map these to the complex paths in your Python script 
-        //             const soundFile = SOUND_OPTIONS[hab][optionIdx];
-        //             playSound(soundFile);
-        //         }
-        //         if (e.key === "Enter" && selectedOptions[hab] !== undefined) {
-        //             if (currentHabIdx < HABITATS.length - 1) {
-        //                 // Move to the next habitat
-        //                 currentHabIdx++;
-        //                 updateMenu();
-        //             } else {
-        //                 // All habitats have been cycled through. 
-        //                 // Now verify if every habitat actually has a saved selection.
-        //                 const allSelected = HABITATS.every(h => selectedOptions[h] !== undefined);
-                        
-        //                 if (allSelected) {
-        //                     document.getElementById('start-btn').classList.remove('hidden');
-        //                     document.getElementById('menu-instructions').innerText = "All sounds selected! Click below to begin.";
-                            
-        //                     // Optional: Stop the narrator audio so it doesn't overlap with the start of the game
-        //                     if (activeAudio) activeAudio.pause();
-        //                 } else {
-        //                     document.getElementById('menu-instructions').innerText = "Please select a sound (1, 2, or 3) for this habitat first.";
-        //                 }
-        //             }
-        //         }
-        //     }
-        // });
+        
 
         // --- DATA LOGGING  ---
         function logInteraction(habitat, choice) {
@@ -401,76 +314,7 @@
         const mapImg = new Image();
         mapImg.src = 'craved_map1.jpeg';
 
-        // function startActivity() {
-        //     phase = "ACTIVITY";
-        //     document.getElementById('setup-screen').classList.add('hidden');
-        //     document.getElementById('game-container').classList.remove('hidden');
-            
-        //     maskCanvas.width = 640; maskCanvas.height = 480;
-        //     maskCtx.drawImage(maskImg, 0, 0, 640, 480);
-
-        //     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        //     hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
-        //     hands.onResults(onResults);
-
-        //     const camera = new Camera(videoElement, {
-        //         onFrame: async () => { await hands.send({image: videoElement}); },
-        //         width: 640, height: 480
-        //     });
-        //     camera.start();
-        // }
-
-        // function onResults(results) {
-        //     if (cvReady) {
-        //         detectMarkers(results.image);
-        //     }
-
-        //     camCtx.save();
-        //     camCtx.clearRect(0, 0, 640, 480);
-        //     camCtx.drawImage(results.image, 0, 0, 640, 480);
-            
-        //     mapCtx.clearRect(0, 0, 640, 480);
-        //     mapCtx.drawImage(mapImg, 0, 0, 640, 480);
-
-        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        //         const landmarks = results.multiHandLandmarks[0];
-        //         const tip = landmarks[8]; 
-        //         const x = tip.x * 640;
-        //         const y = tip.y * 480;
-
-        //         drawPointer(camCtx, x, y, "lime");
-        //         drawPointer(mapCtx, x, y, "magenta");
-        //         processCollision(x, y);
-        //     } else {
-        //         if (activeAudio && phase === "ACTIVITY") activeAudio.pause();
-        //         lastDetectedHabitat = null;
-        //     }
-        //     camCtx.restore();
-        // }
-
-        // function startActivity() {
-        //     phase = "ACTIVITY";
-        //     document.getElementById('setup-screen').classList.add('hidden');
-        //     document.getElementById('game-container').classList.remove('hidden');
-            
-        //     // Set internal canvas dimensions to match the camera stream
-        //     camCanvas.width = 640; 
-        //     camCanvas.height = 480;
-        //     mapCanvas.width = 640; 
-        //     mapCanvas.height = 480;
-
-        //     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        //     hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
-        //     hands.onResults(onResults);
-
-        //     const camera = new Camera(videoElement, {
-        //         onFrame: async () => { 
-        //             await hands.send({image: videoElement}); 
-        //         },
-        //         width: 640, height: 480
-        //     });
-        //     camera.start();
-        // }
+        
 
         function startActivity() {
             phase = "ACTIVITY";
@@ -498,106 +342,46 @@
         }
 
         function onResults(results) {
-            // 1. Draw camera first (independent of map)
+            // ZOOM FIX: Force canvas dimensions to match stream every frame
+            if (camCanvas.width !== 640) camCanvas.width = 640;
+            if (camCanvas.height !== 480) camCanvas.height = 480;
+
             camCtx.save();
             camCtx.clearRect(0, 0, 640, 480);
             camCtx.drawImage(results.image, 0, 0, 640, 480);
             
-            // 2. ONLY draw the map if it's successfully loaded
-            // .complete checks if it's done; .naturalWidth > 0 ensures it's not a 404
             if (mapImg.complete && mapImg.naturalWidth > 0) {
                 mapCtx.clearRect(0, 0, 640, 480);
                 mapCtx.drawImage(mapImg, 0, 0, 640, 480);
-            } else {
-                // Optional: show a loading message on the map canvas
-                mapCtx.fillStyle = "white";
-                mapCtx.fillText("Loading Map Asset...", 20, 20);
             }
 
-            // 3. Continue with AI logic
             if (cvReady) {
-                try {
-                    detectMarkers(results.image);
-                } catch (err) {
-                    console.error("CV Error:", err);
-                }
+                try { detectMarkers(results.image); } 
+                catch (err) { console.warn("Marker Detection Error:", err); }
             }
-            // ... rest of your hand tracking code ...
+
+            // HAND TRACKING RESTORED
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                const tip = landmarks[8]; 
+                const x = tip.x * 640;
+                const y = tip.y * 480;
+
+                drawPointer(camCtx, x, y, "lime");
+                drawPointer(mapCtx, x, y, "magenta");
+
+                // NULL ERROR FIX: Guard check for homographyMatrix
+                if (homographyMatrix) {
+                    processCollision(x, y);
+                }
+            } else {
+                if (activeAudio && activeAudio.loop) activeAudio.pause();
+                lastDetectedHabitat = null;
+            }
             camCtx.restore();
         }
 
-        // function onResults(results) {
-        //     // 1. Force the video to draw every single frame (prevent freezing)
-        //     camCtx.save();
-        //     camCtx.clearRect(0, 0, 640, 480);
-        //     camCtx.drawImage(results.image, 0, 0, 640, 480);
-            
-        //     mapCtx.clearRect(0, 0, 640, 480);
-        //     mapCtx.drawImage(mapImg, 0, 0, 640, 480);
-
-        //     // 2. Wrap CV in a try/catch so a crash doesn't stop the camera
-        //     if (cvReady) {
-        //         try {
-        //             // Using results.image directly from MediaPipe
-        //             // detectMarkers(results.image);
-        //         } catch (err) {
-        //             console.warn("CV Processing error:", err);
-        //         }
-        //     }
-
-        //     // 3. Hand Tracking
-        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        //         const landmarks = results.multiHandLandmarks[0];
-        //         const tip = landmarks[8]; 
-        //         const x = tip.x * 640;
-        //         const y = tip.y * 480;
-
-        //         drawPointer(camCtx, x, y, "lime");
-        //         drawPointer(mapCtx, x, y, "magenta");
-        //         processCollision(x, y);
-        //     } else {
-        //         if (activeAudio && phase === "ACTIVITY" && activeAudio.loop) {
-        //             activeAudio.pause();
-        //         }
-        //         lastDetectedHabitat = null;
-        //     }
-        //     camCtx.restore();
-        // }
-
-        // function onResults(results) {
-        //     // 1. Always draw the camera feed first so it's never black
-        //     camCtx.save();
-        //     camCtx.clearRect(0, 0, camCanvas.width, camCanvas.height);
-        //     camCtx.drawImage(results.image, 0, 0, camCanvas.width, camCanvas.height);
-            
-        //     // 2. Draw the Map
-        //     mapCtx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-        //     mapCtx.drawImage(mapImg, 0, 0, mapCanvas.width, mapCanvas.height);
-
-        //     // 3. Process markers if OpenCV is ready
-        //     if (cvReady) {
-        //         detectMarkers(results.image);
-        //     }
-
-        //     // 4. Handle Hand Landmarks
-        //     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        //         const landmarks = results.multiHandLandmarks[0];
-        //         const tip = landmarks[8]; 
-        //         const x = tip.x * camCanvas.width;
-        //         const y = tip.y * camCanvas.height;
-
-        //         drawPointer(camCtx, x, y, "lime");
-        //         drawPointer(mapCtx, x, y, "magenta");
-        //         processCollision(x, y);
-        //     } else {
-        //         if (activeAudio && phase === "ACTIVITY") {
-        //             // Only pause if it's a looping habitat sound, not the narrator
-        //             if (activeAudio.loop) activeAudio.pause();
-        //         }
-        //         lastDetectedHabitat = null;
-        //     }
-        //     camCtx.restore();
-        // }
+        
 
         function drawPointer(ctx, x, y, color) {
             ctx.beginPath();
@@ -653,57 +437,10 @@
             }
         }
 
-        // --- PIXEL COLLISION LOGIC  ---
-        // function processCollision(fingerX, fingerY) {
-        //     if (!homographyMatrix || !maskLoaded) return;
-
-        //     let srcPtData = new Float32Array([fingerX, fingerY]);
-        //     let pt = cv.matFromArray(1, 1, cv.CV_32FC2, srcPtData);
-        //     let transformedPt = new cv.Mat();
-
-        //     cv.perspectiveTransform(pt, transformedPt, homographyMatrix);
-
-        //     let mapX = transformedPt.data32F[0];
-        //     let mapY = transformedPt.data32F[1];
-
-
-        //     if (mapX >= 0 && mapX < 640 && mapY >= 0 && mapY < 480) {
-        //         const pixel = maskCtx.getImageData(mapX, mapY, 1, 1).data;
-        //         const rgb = `rgb(${pixel[0]},${pixel[1]},${pixel[2]})`;
-                
-        //         const colorMap = {
-        //             "rgb(95,254,201)": "Sparse live bottom",
-        //             "rgb(0,68,52)": "Dense live bottom",
-        //             "rgb(254,89,84)": "Flat sand",
-        //             "rgb(252,229,185)": "Rippled sand"
-        //         };
-
-        //         let detected = colorMap[Object.keys(colorMap).find(key => key.replace(/\s/g,'') === rgb.replace(/\s/g,''))] || null;
-
-        //         if (detected && detected !== lastDetectedHabitat) {
-        //             const choice = selectedOptions[detected] + 1;
-        //             playSound(`sounds/${detected.replace(/ /g, "_")}_option${choice}.wav`, true);
-        //             document.getElementById('status-text').innerText = `Habitat: ${detected}`;
-        //             logInteraction(detected, choice);
-        //             lastDetectedHabitat = detected;
-        //         }
-        //     }
-
-        //     pt.delete(); transformedPt.delete();
-        // }
 
         document.getElementById('start-btn').onclick = startActivity;
 
-        let homographyMatrix = null;
-        const maskImg = new Image(); // Ensure this is globally defined
-        let maskLoaded = false;
-
-        maskImg.onload = () => {
-            maskLoaded = true;
-            maskCanvas.width = 640; 
-            maskCanvas.height = 480;
-            maskCtx.drawImage(maskImg, 0, 0, 640, 480);
-        };
+        
 
         function detectMarkers(videoFrame) {
             // Check if videoFrame is valid for OpenCV
@@ -758,59 +495,6 @@
             dictionary.delete(); detector.delete();
         }
 
-        // function detectMarkers(videoFrame) {
-        //     let mat = cv.imread(videoFrame);
-        //     let ids = new cv.Mat();
-        //     let cornersList = new cv.MarkerCornerList();
-        //     // let dictionary = cv.getPredefinedDictionary(cv.getPredefinedDictionary(cv.DICT_4X4_50));
-        //     let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
-        //     let detector = new cv.ArUcoDetector(dictionary, new cv.DetectorParameters());
-
-        //     detector.detect(mat, cornersList, ids);
-
-        //     if (ids.rows > 0) {
-        //         let id = ids.data32S[0]; // Get the first detected ID
-        //         let markerCorners = cornersList.get(0);
-        //         let calib_pts;
-        //         if ([3, 9, 11].includes(id)) {
-        //             let size = (id !== 11) ? 490 : 277;
-        //             // Define the 4 corners of the map relative to this marker size
-        //             calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
-        //         } else if ([4, 21].includes(id)) {
-        //             calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
-        //         } else if ([20, 22, 27].includes(id)) {
-        //             // Matching coordinates from Python source [cite: 37, 38]
-        //             calib_pts = [640-535, 580, 640-182, 580, 640-182, 934, 640-535, 934];
-        //         }
-
-        //         if (calib_pts) {
-
-        //             let offset_pts = calib_pts.map((val, idx) => {
-        //                 if (idx % 2 === 0) return (val * calibration.scale) + calibration.x; // Adjust X
-        //                 return (val * calibration.scale) + calibration.y; // Adjust Y
-        //             });
-        //             // let srcPts = cv.matFromArray(4, 1, cv.CV_32FC2, markerCorners);
-        //             let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
-                    
-        //             // Calculate and store Homography [cite: 38, 39]
-        //             if (homographyMatrix) homographyMatrix.delete(); // Clean old matrix
-        //             homographyMatrix = cv.findHomography(markerCorners, dstPts);
-
-        //             dstPts.delete();
-        //         }
-
-        //         // Map switching logic
-        //         if (MAP_CONFIG[id] && id !== last_marker_id) {
-        //             last_marker_id = id;
-        //             maskLoaded = false;
-        //             mapImg.src = MAP_CONFIG[id].img;
-        //             maskImg.src = MAP_CONFIG[id].mask;
-        //         }
-        //     }
-
-        //     mat.delete(); ids.delete(); cornersList.delete();
-        //     dictionary.delete(); detector.delete();
-        // }
 
     </script>
 </body>
