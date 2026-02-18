@@ -504,6 +504,7 @@
             // if (!videoFrame || videoFrame.width === 0 || !cvReady) return;
 
             let mat = cv.imread(videoFrame);
+            console.log("mat ok");
             
             // --- THE FIX ---
             // Flip the image horizontally (1 = horizontal flip)
@@ -512,12 +513,15 @@
 
             let gray = new cv.Mat();
             cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY,0);
+            console.log("gray ok");
 
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
+            console.log("cornersList ok");
             
             // Ensure this matches your printed tag (DICT_4X4_50 or DICT_APRILTAG_36h11)
             let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
+            console.log("dict ok");
             let parameters = new cv.DetectorParameters();
             parameters.adaptiveThreshWinSizeMin = 3;
             parameters.adaptiveThreshWinSizeMax = 23;
@@ -526,6 +530,7 @@
             parameters.minMarkerPerimeterRate = 0.03; 
 
             let detector = new cv.ArUcoDetector(dictionary, parameters);
+            console.log("detector ok");
 
             detector.detect(gray, cornersList, ids);
             // console.log("Detecting... Markers found:", ids.rows);
