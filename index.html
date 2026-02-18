@@ -498,6 +498,48 @@
             dictionary.delete(); detector.delete();
         }
 
+        function drawCalibrationOverlay(ctx) {
+            if (!homographyMatrix || !cvReady) return;
+
+            try {
+                // Create an inverse matrix to map from Map-space back to Camera-space
+                let invHomography = new cv.Mat();
+                cv.invert(homographyMatrix, invHomography);
+
+                // The four corners of our 640x480 map
+                const mapCorners = [{x:0, y:0}, {x:640, y:0}, {x:640, y:480}, {x:0, y:480}];
+                
+                ctx.beginPath();
+                ctx.strokeStyle = "#00ffff"; // Cyan
+                ctx.lineWidth = 3;
+
+                for (let i = 0; i < mapCorners.length; i++) {
+                    let ptData = new Float32Array([mapCorners[i].x, mapCorners[i].y]);
+                    let pt = cv.matFromArray(1, 1, cv.CV_32FC2, ptData);
+                    let camPt = new cv.Mat();
+                    
+                    cv.perspectiveTransform(pt, camPt, invHomography);
+                    
+                    let px = camPt.data32F[0];
+                    let py = camPt.data32F[1];
+
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+
+                    pt.delete(); camPt.delete();
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                ctx.fillStyle = "#00ffff";
+                ctx.fillText("MAP AREA", 10, 20);
+                
+                invHomography.delete();
+            } catch (e) {
+                // If the marker is tilted too sharply, the math might fail briefly
+            }
+        }
+
 
     </script>
 </body>
