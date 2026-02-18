@@ -516,9 +516,15 @@
             cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY,0);
             console.log("gray ok");
 
+            // let ids = new cv.Mat();
+            // let cornersList = new cv.MarkerCornerList();
+            // console.log("cornersList ok");
             let ids = new cv.Mat();
-            let cornersList = new cv.MarkerCornerList();
+            console.log("ids ok");
+            let cornersList = new cv.MatVector();
             console.log("cornersList ok");
+            let rejectedPoints = new cv.MatVector();
+            console.log("rejectedPoints ok");
             
             // Ensure this matches your printed tag (DICT_4X4_50 or DICT_APRILTAG_36h11)
             let dictionary = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
