@@ -168,8 +168,10 @@
 
         maskImg.onload = () => {
             maskLoaded = true;
+            // We force the context to draw the new mask as soon as it loads
             maskCtx.clearRect(0, 0, 640, 480);
             maskCtx.drawImage(maskImg, 0, 0, 640, 480);
+            console.log("Collision Mask Updated for ID:", last_marker_id);
         };
 
 
@@ -385,25 +387,44 @@
             camCtx.clearRect(0, 0, 640, 480);
             camCtx.drawImage(results.image, 0, 0, 640, 480);
             
-            // CALL THE OVERLAY HERE
-            if (homographyMatrix) drawCalibrationOverlay(camCtx);
+            // 1. Process Marker Detection first
+            if (cvReady) {
+                try { detectMarkers(results.image); } 
+                catch (err) { console.warn("Marker Error:", err); }
+            }
+
+            // 2. Marker UI Feedback
+            if (homographyMatrix) {
+                drawCalibrationOverlay(camCtx);
+                
+                // DRAW "MARKER FOUND" TEXT
+                camCtx.fillStyle = "#00FF00";
+                camCtx.font = "bold 20px Arial";
+                camCtx.fillText("✔ MARKER DETECTED (ID: " + last_marker_id + ")", 20, 40);
+            } else {
+                camCtx.fillStyle = "#FF0000";
+                camCtx.fillText("✘ NO MARKER", 20, 40);
+            }
 
             if (mapImg.complete && mapImg.naturalWidth > 0) {
                 mapCtx.clearRect(0, 0, 640, 480);
                 mapCtx.drawImage(mapImg, 0, 0, 640, 480);
             }
 
-            if (cvReady) {
-                try { detectMarkers(results.image); } 
-                catch (err) { console.warn("Marker Error:", err); }
-            }
-
+            // 3. Hand Tracking & Collision
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const x = results.multiHandLandmarks[0][8].x * 640;
                 const y = results.multiHandLandmarks[0][8].y * 480;
                 drawPointer(camCtx, x, y, "lime");
                 drawPointer(mapCtx, x, y, "magenta");
-                if (homographyMatrix && maskLoaded) processCollision(x, y);
+                
+                // Safety check for collision
+                if (homographyMatrix && maskLoaded) {
+                    processCollision(x, y);
+                }
+            } else {
+                if (activeAudio && activeAudio.loop) activeAudio.pause();
+                lastDetectedHabitat = null;
             }
             camCtx.restore();
         }
@@ -469,7 +490,6 @@
         
 
         function detectMarkers(videoFrame) {
-            // Check if videoFrame is valid for OpenCV
             if (!videoFrame || videoFrame.width === 0) return;
 
             let mat = cv.imread(videoFrame);
@@ -485,7 +505,7 @@
                 let markerCorners = cornersList.get(0);
                 let calib_pts = null;
 
-                // Ensure we match marker IDs to calibration points
+                // Calibration logic
                 if ([3, 9, 11].includes(id)) {
                     let size = (id !== 11) ? 490 : 277;
                     calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
@@ -500,23 +520,21 @@
                         if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
                         return (val * calibration.scale) + calibration.y;
                     });
-                    
                     let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
-                    
                     if (homographyMatrix) homographyMatrix.delete();
                     homographyMatrix = cv.findHomography(markerCorners, dstPts);
-
                     dstPts.delete();
                 }
 
+                // TRIGGER MASK SWAP
                 if (MAP_CONFIG[id] && id !== last_marker_id) {
                     last_marker_id = id;
+                    maskLoaded = false; // Reset until new image loads
                     mapImg.src = MAP_CONFIG[id].img;
-                    maskImg.src = MAP_CONFIG[id].mask;
+                    maskImg.src = MAP_CONFIG[id].mask; // This triggers maskImg.onload
                 }
             }
 
-            // CLEANUP: Essential to prevent memory leaks that cause freezes
             mat.delete(); ids.delete(); cornersList.delete();
             dictionary.delete(); detector.delete();
         }
