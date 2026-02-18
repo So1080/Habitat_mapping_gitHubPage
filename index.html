@@ -493,6 +493,7 @@
             if (!videoFrame || videoFrame.width === 0) return;
 
             let mat = cv.imread(videoFrame);
+            cv.flip(mat, mat, 1);
             let ids = new cv.Mat();
             let cornersList = new cv.MarkerCornerList();
             // let dictionary = cv.getPredefinedDictionary(cv.DICT_6X6_250);
