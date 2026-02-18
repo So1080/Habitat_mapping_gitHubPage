@@ -536,10 +536,11 @@
             // Lower this if the image is blurry
             parameters.minMarkerPerimeterRate = 0.03; 
 
-            let detector = new cv.ArUcoDetector(dictionary, parameters);
-            console.log("detector ok");
+            // let detector = new cv.ArUcoDetector(dictionary, parameters);
+            console.log("param ok");
 
-            detector.detect(gray, cornersList, ids);
+            // detector.detect(gray, cornersList, ids);
+            cv.detectMarkers(gray, dictionary, cornersList, ids, parameters, rejectedPoints);
             // console.log("Detecting... Markers found:", ids.rows);
             console.log("Input Mat size:", mat.cols, "x", mat.rows, "Channels:", mat.channels());
             console.log("IDs found:", ids.rows);
