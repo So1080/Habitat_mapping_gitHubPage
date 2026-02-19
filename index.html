@@ -526,7 +526,8 @@
             let rejectedPoints = new cv.MatVector();
 
             try {
-                cv.detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
+                // cv.detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
+                cv.aruco_detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
                 console.log("Markers detected:", ids.rows);
                 
 
