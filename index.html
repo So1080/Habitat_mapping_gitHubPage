@@ -375,16 +375,17 @@
                     if (i === 0) ctx.moveTo(px, py);
                     else ctx.lineTo(px, py);
 
-                    pt.delete(); camPt.delete();
+                    pt.delete();
+                    camPt.delete();
                 }
                 ctx.closePath();
                 ctx.stroke();
                 invHomography.delete();
-            } catch (e) { /* Ignore transient math errors */ }
+            } catch (e) { console.warn("Overlay error:", e); }
         }
 
         function onResults(results) {
-            console.log("MediaPipe is sending frames");
+            // console.log("MediaPipe is sending frames");
             if (camCanvas.width !== 640) camCanvas.width = 640;
             if (camCanvas.height !== 480) camCanvas.height = 480;
 
@@ -398,20 +399,31 @@
                 catch (err) { console.warn("Marker Error:", err); }
             }
 
+            camCtx.font = "bold 24px Arial";
+            if (last_marker_id !== null) {
+                camCtx.fillStyle = "#00FF00"; // Green
+                camCtx.fillText(`✔ DETECTING ID: ${last_marker_id}`, 20, 40);
+                document.getElementById('status-text').innerText = `Active Marker: ${last_marker_id}`;
+            } else {
+                camCtx.fillStyle = "#FF0000"; // Red
+                camCtx.fillText("✘ SEARCHING FOR MARKERS...", 20, 40);
+            }
+
             // 2. Marker UI Feedback
             if (homographyMatrix) {
                 drawCalibrationOverlay(camCtx);
                 
-                // DRAW "MARKER FOUND" TEXT
-                camCtx.fillStyle = "#00FF00";
-                camCtx.font = "bold 20px Arial";
-                camCtx.fillText("✔ MARKER DETECTED (ID: " + last_marker_id + ")", 20, 40);
-            } else {
-                camCtx.fillStyle = "#FF0000";
-                camCtx.fillText("✘ NO MARKER", 20, 40);
+            //     // DRAW "MARKER FOUND" TEXT
+            //     camCtx.fillStyle = "#00FF00";
+            //     camCtx.font = "bold 20px Arial";
+            //     camCtx.fillText("✔ MARKER DETECTED (ID: " + last_marker_id + ")", 20, 40);
+            // } else {
+            //     camCtx.fillStyle = "#FF0000";
+            //     camCtx.fillText("✘ NO MARKER", 20, 40);
             }
 
-            if (mapImg.complete && mapImg.naturalWidth > 0) {
+            // if (mapImg.complete && mapImg.naturalWidth > 0) {
+            if (mapImg.complete) {
                 mapCtx.clearRect(0, 0, 640, 480);
                 mapCtx.drawImage(mapImg, 0, 0, 640, 480);
             }
@@ -543,32 +555,55 @@
                 // cv.detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
                 // cv.aruco_detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
                 console.log("Markers detected:", ids.rows);
+
+                const map_w = mapImg.naturalWidth;
+                const map_h = mapImg.naturalHeight;
+                let raw_pts = [];
                 
 
                 if (ids.rows > 0) {
                     let id = ids.data32S[0];
                     // Access corners from MatVector
                     let markerCorners = cornersList.get(0);
+                    last_marker_id = id;
                     
                     // ... your calibration and homography logic ...
                     console.log("Marker Detected ID:", id);
+                    let full_map_pts = [0, 0, 640, 0, 640, 480, 0, 480];
+
                     
                     // Logic for mapping (matching your snippet)
-                    let calib_pts = null;
-                    if ([0, 3, 9, 11].includes(id)) {
-                        let size = (id !== 11) ? 490 : 277;
-                        calib_pts = [640-size, 0, 640, 0, 640, size, 640-size, size];
+                    if ([3, 9, 11].includes(id)) {
+                        let size = (id != 11) ? 490 : 277;
+                        // Anchored to Top-Right
+                        raw_pts = [map_w - size, 0, map_w, 0, map_w, size, map_w - size, size];
                     } else if ([4, 21].includes(id)) {
-                        calib_pts = [640-344, 30, 640-42, 30, 640-42, 338, 640-344, 338];
+                        raw_pts = [map_w - 344, 30, map_w - 42, 30, map_w - 42, 338, map_w - 344, 338];
+                    } else if ([20, 22, 27].includes(id)) {
+                        // Updated to use actual map_w and map_h for IDs 20, 22, 27
+                        raw_pts = [map_w - 535, 580, map_w - 182, 580, map_w - 182, 934, map_w - 535, 934];
                     }
 
-                    if (calib_pts) {
-                        let offset_pts = calib_pts.map((val, idx) => {
+                    // if (calib_pts) {
+                    //     let offset_pts = calib_pts.map((val, idx) => {
+                    //         if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
+                    //         return (val * calibration.scale) + calibration.y;
+                    //     });
+                    //     let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
+                        
+                    //     if (homographyMatrix) homographyMatrix.delete();
+                    //     homographyMatrix = cv.findHomography(markerCorners, dstPts);
+                    //     dstPts.delete();
+                    // }
+
+                    if (raw_pts.length > 0) {
+                        // Apply scale/offset for calibration
+                        let offset_pts = raw_pts.map((val, idx) => {
                             if (idx % 2 === 0) return (val * calibration.scale) + calibration.x;
                             return (val * calibration.scale) + calibration.y;
                         });
+
                         let dstPts = cv.matFromArray(4, 1, cv.CV_32FC2, offset_pts);
-                        
                         if (homographyMatrix) homographyMatrix.delete();
                         homographyMatrix = cv.findHomography(markerCorners, dstPts);
                         dstPts.delete();
