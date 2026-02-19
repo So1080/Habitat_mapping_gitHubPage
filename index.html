@@ -516,6 +516,11 @@
                 arucoParams.adaptiveThreshWinSizeStep = 10;
             }
 
+            if (!detector) {
+                // Match the documentation: cv::aruco::ArucoDetector detector(dictionary, detectorParams);
+                detector = new cv.aruco_ArucoDetector(arucoDict, arucoParams);
+            }
+
             let mat = cv.imread(document.getElementById('cam_canvas'));
             let gray = new cv.Mat();
             cv.cvtColor(mat, gray, cv.COLOR_RGBA2GRAY, 0);
@@ -525,9 +530,11 @@
             let cornersList = new cv.MatVector();
             let rejectedPoints = new cv.MatVector();
 
+            detector.detectMarkers(gray, cornersList, ids, rejectedPoints);
+
             try {
                 // cv.detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
-                cv.aruco_detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
+                // cv.aruco_detectMarkers(gray, arucoDict, cornersList, ids, arucoParams, rejectedPoints);
                 console.log("Markers detected:", ids.rows);
                 
 
