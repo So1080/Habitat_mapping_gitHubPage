@@ -506,7 +506,8 @@
                 return;
             }
 
-            if (!arucoDict) arucoDict = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
+            // if (!arucoDict) arucoDict = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);cv.DICT_4X4_50
+            if (!arucoDict) arucoDict = cv.getPredefinedDictionary(cv.DICT_4X4_50);
             if (!arucoParams) {
                 try {
                     arucoParams = new cv.aruco_DetectorParameters();
