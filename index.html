@@ -386,8 +386,8 @@
 
         function onResults(results) {
             // console.log("MediaPipe is sending frames");
-            if (camCanvas.width !== 640) camCanvas.width = 640;
-            if (camCanvas.height !== 480) camCanvas.height = 480;
+            // if (camCanvas.width !== 640) camCanvas.width = 640;
+            // if (camCanvas.height !== 480) camCanvas.height = 480;
 
             camCtx.save();
             camCtx.clearRect(0, 0, 640, 480);
@@ -423,7 +423,7 @@
             }
 
             // if (mapImg.complete && mapImg.naturalWidth > 0) {
-            if (mapImg.complete) {
+            if (mapImg.complete && mapImg.naturalWidth > 0) {
                 mapCtx.clearRect(0, 0, 640, 480);
                 mapCtx.drawImage(mapImg, 0, 0, 640, 480);
             }
