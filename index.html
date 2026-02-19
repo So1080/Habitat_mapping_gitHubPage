@@ -519,8 +519,7 @@
             }
 
             if (!arucoRefine) {
-                try { arucoRefine = new cv.aruco_RefineParameters(); }
-                catch (e) { arucoRefine = cv.aruco_RefineParameters(); }
+                arucoRefine = new cv.aruco_RefineParameters();
             }
 
             if (!detector) {
