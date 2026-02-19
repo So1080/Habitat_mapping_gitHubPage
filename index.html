@@ -494,6 +494,7 @@
         let arucoDict = null;
         let arucoParams = null;
         let detector = null;
+        let arucoRefine = null;
         
 
         function detectMarkers(videoFrame) {
@@ -517,9 +518,14 @@
                 arucoParams.adaptiveThreshWinSizeStep = 10;
             }
 
+            if (!arucoRefine) {
+                try { arucoRefine = new cv.aruco_RefineParameters(); }
+                catch (e) { arucoRefine = cv.aruco_RefineParameters(); }
+            }
+
             if (!detector) {
                 // Match the documentation: cv::aruco::ArucoDetector detector(dictionary, detectorParams);
-                detector = new cv.aruco_ArucoDetector(arucoDict, arucoParams);
+                detector = new cv.aruco_ArucoDetector(arucoDict, arucoParams, arucoRefine);
             }
 
             let mat = cv.imread(document.getElementById('cam_canvas'));
