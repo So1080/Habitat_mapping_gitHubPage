@@ -504,9 +504,13 @@
                 return;
             }
 
-            if (!arucoDict) arucoDict = new cv.aruco_Dictionary(cv.DICT_APRILTAG_36h11);
+            if (!arucoDict) arucoDict = cv.getPredefinedDictionary(cv.DICT_APRILTAG_36h11);
             if (!arucoParams) {
-                arucoParams = new cv.aruco_DetectorParameters();
+                try {
+                    arucoParams = new cv.aruco_DetectorParameters();
+                } catch (e) {
+                    arucoParams = cv.aruco_DetectorParameters();
+                }
                 arucoParams.adaptiveThreshWinSizeMin = 3;
                 arucoParams.adaptiveThreshWinSizeMax = 23;
                 arucoParams.adaptiveThreshWinSizeStep = 10;
